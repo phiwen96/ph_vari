@@ -10,6 +10,10 @@ struct A
     A (){cout << "A ()" << endl;}
     ~A (){cout << "~A ()" << endl;}
 
+    A& operator= (A other)
+    {
+        return *this;
+    }
 };
 
 struct B
@@ -37,13 +41,45 @@ struct D
 
 TEST_CASE("is not class")
 {
-    var <A, B, C, D> k {A {}};
-    cout << k << endl;
-    cout << "====" << endl;
-    k = B{};
-    cout << "====" << endl;
+//    cout << sizeof (variant <int, double, char, string>) << endl;
+//    cout << sizeof (var <int, double, char, string>) << endl;
+//    int max = 10000000;
+    int max = 0;
+
+    {
+        Timer <true> t ("variant");
+        for (int i = 0; i < max; ++i)
+        {
+            variant <int, double, char, string> k {string {}};
+        }
+    }
+    {
+        Timer <true> t ("vari");
+        for (int i = 0; i < max; ++i)
+        {
+            var <int, double, char, string> k {string {}};
+        }
+    }
+    
+    
+    var <A, int, C, D> k {int {2}};
+    var <A, C, B, int> k2 {int{7}};
+    k = k2;
+    return;
+    
+//    cout << k << endl;
+//    cout << "====" << endl;
+//    k = A{};
+//    cout << k << endl;
+//
+//    cout << "====" << endl;
+////    k = B {};
+//    cout << k << endl;
+
     /**
      NOT
      k = string {};
      */
 }
+
+
