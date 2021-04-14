@@ -25,21 +25,33 @@ struct var
     var () = default;
     
     
-    
-    
-    auto operator= (T&& t) -> auto&
+    template <typename P>
+    requires (type_list_t <T, U...>::template find <P> >= 0)
+    auto operator= (P&& t) -> auto&
     {
         cout << "lkmk" << endl;
-        int j = 100;
-        if (j)
+        
+        /**
+         If active, delete current vari and all before (?)
+         */
+        if (active >= 0)
         {
-            switch (j)
+            switch (active)
             {
-#define X(n) \
-    cout << n << endl;
+                #define X(n) \
+                    cout << n << endl;
+                    
                     SWITCH_CASE (200, cout << "")
+                #undef X
             }
+        } else
+        {
+            value.template init <type_list_t <T, U...>::template find <P>, P> ();
         }
+        
+        
+        
+        
         
         
 //        value.set_equal (forward <T> (t), active);
@@ -85,6 +97,20 @@ union vari <I, construct, T, U...>
     requires (construct == -1)
     {
         
+    }
+    
+    template <int i, typename P>
+    requires (i == I and is_same_v <P, value_type>)
+    auto init () -> void
+    {
+        cout << "yes" << endl;
+    }
+    
+    template <int i, typename P>
+    requires (i != I and (not is_same_v <P, value_type>))
+    auto init () -> void
+    {cout << "not" << endl;
+        _tail.template init <i, P> ();
     }
     
     template <int i>
@@ -189,6 +215,10 @@ union vari <I, construct, T, U...>
 template <int I, int construct, typename T>
 union vari <I, construct, T>
 {
+    using value_type = T;
+    
+    
+    
     emptyy _;
     T value;
     
@@ -198,6 +228,13 @@ union vari <I, construct, T>
         requires (construct == I)
     {
             new (&value) T {};
+    }
+    
+    template <int i, typename P>
+    requires (i == I and is_same_v <P, value_type>)
+    auto init () -> void
+    {
+        
     }
     
     template <int i>

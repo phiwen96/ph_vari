@@ -1,6 +1,7 @@
 #include <catch2/catch.hpp>
 #include <ph_vari/vari.hpp>
 #include <ph_time/timer.hpp>
+#include <ph_type_list/type_list.hpp>
 using namespace std;
 
 struct A
@@ -26,5 +27,11 @@ struct C
 
 TEST_CASE("is not class")
 {
- 
+    var <A, B, C> k;
+    k = B{};
+    cout << "====" << endl;
+    /**
+     NOT
+     k = string {};
+     */
 }
