@@ -1,0 +1,12 @@
+[submodule "cmake/phake"]
+	path = cmake/phake
+	url = https://github.com/phiwen96/phake
+[submodule "dependencies/ph_type_list"]
+	path = dependencies/ph_type_list
+	url = https://github.com/phiwen96/ph_type_list
+[submodule "dependencies/ph_macros"]
+	path = dependencies/ph_macros
+	url = https://github.com/phiwen96/ph_macros
+[submodule "dependencies/ph_time"]
+	path = dependencies/ph_time
+	url = https://github.com/phiwen96/ph_time
