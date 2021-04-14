@@ -11,7 +11,7 @@
 
 
 
-template <int, int, typename...>
+template <int, typename...>
 union vari {};
 
 template <typename T, typename... U>
@@ -20,34 +20,64 @@ struct var
     inline static constexpr int size = sizeof... (U) + 1;
     int active {-1};
 
-    vari <0, -1, T, U...> value;
+    vari <0, T, U...> value;
     
     var () = default;
+    
+    template <typename P>
+    var (P&& arg) : value {forward <P> (arg)}, active {type_list_t <T, U...>::template find <P>}
+    {
+        cout << active << endl;
+    }
     
     
     template <typename P>
     requires (type_list_t <T, U...>::template find <P> >= 0)
-    auto operator= (P&& t) -> auto&
+    auto operator= (P&& p) -> auto&
     {
+        static constexpr int set_equal_at = type_list_t <T, U...>::template find <P>;
+        
         cout << "lkmk" << endl;
         
         /**
          If active, delete current vari and all before (?)
          */
+//        value.template deinit_value <0> ();
         if (active >= 0)
         {
-            switch (active)
+            if (active == set_equal_at)
             {
-                #define X(n) \
-                    cout << n << endl;
-                    
-                    SWITCH_CASE (200, cout << "")
-                #undef X
+                if constexpr (requires () {
+                    true;
+                })
+                {
+                    cout << "tjo" << endl;
+                }
+//                return value.template get <set_equal_at> ().value = forward <P> (p);
+            } else
+            {
+                switch (active)
+                {
+                    #define X(n) \
+                        value.template deinit_value <n> ();
+                        SWITCH_CASE (200)
+                    #undef X
+                }
+                auto& a = value.template get <set_equal_at> ();
+                new (&a.value) P {forward <P> (p)};
+                return a.value;
             }
-        } else
-        {
-            value.template init <type_list_t <T, U...>::template find <P>, P> ();
+
+            
+            /**
+             1 1 2 0
+             1 1 1 2
+             */
         }
+        
+        
+//        return value.template set_equal <P> (forward <P> (p));
+//        new (value.template init <set_equal_at, P> ().value = forward <P> (p)) ;
         
         
         
@@ -55,7 +85,22 @@ struct var
         
         
 //        value.set_equal (forward <T> (t), active);
-        return *this;
+//        return *this;
+    }
+    friend ostream& operator<< (ostream& os, var const& v)
+    {
+//        os << v.value.template print <2> ();
+        
+        switch (v.active)
+        {
+#define X(n) \
+os << v.value.template print <n> ();
+
+    SWITCH_CASE (200)
+#undef X
+        }
+
+        return os;
     }
 };
 
@@ -71,46 +116,77 @@ struct var
 
 struct emptyy {};
 
-template <int I, int construct, typename T, typename... U>
+template <int I, typename T, typename... U>
 //requires ((is_assignable_v<U, P> || ...))
-union vari <I, construct, T, U...>
+union vari <I, T, U...>
 {
     using value_type = T;
-    using tail_type = vari <I + 1, construct, U...>;
+    using tail_type = vari <I + 1, U...>;
     emptyy _;
     value_type value;
     tail_type _tail;
     
-    vari ()
-        requires (construct > 0 and construct != I)
-    {
-            new (&_tail) tail_type;
-    }
+//    vari ()
+//    {
+//
+//    }
+  
     
-    vari ()
-        requires (construct == I)
-    {
-            new (&value) value_type {};
-    }
-    
-    vari ()
-    requires (construct == -1)
+    vari (T&& t) : value {forward <T> (t)}
     {
         
     }
     
+    template <typename P>
+    vari (P&& p) : _tail {forward <P> (p)}
+    {
+//        cout << "tjo" << endl;
+    }
+    
+    
+    
     template <int i, typename P>
     requires (i == I and is_same_v <P, value_type>)
-    auto init () -> void
+    auto init () -> auto&
     {
-        cout << "yes" << endl;
+        return *this;
     }
     
     template <int i, typename P>
     requires (i != I and (not is_same_v <P, value_type>))
-    auto init () -> void
-    {cout << "not" << endl;
-        _tail.template init <i, P> ();
+    auto init () -> auto&
+    {
+        return _tail.template init <i, P> ();
+    }
+    
+    template <int from, int to>
+    auto deinit_tail () -> void
+    {
+        
+        
+        if constexpr (I + 1 <= to)
+        {
+            _tail.template deinit_tail <from, to> ();
+            
+            if constexpr (from <= I)
+            {
+                _tail.~tail_type ();
+            }
+        }
+    }
+    
+    template <int i>
+    requires (i >= 0 and i != I)
+    auto deinit_value () -> void
+    {
+        _tail.template deinit_value <i> ();
+    }
+    
+    template <int i>
+    requires (i == I)
+    auto deinit_value () -> void
+    {
+        value.~T ();
     }
     
     template <int i>
@@ -140,7 +216,16 @@ union vari <I, construct, T, U...>
         return *this;
     }
     
-    
+//    template <int i>
+//    auto init_tail () -> void
+//    {
+////        if constexpr (i > I)
+////        {
+//////            new (&_tail) tail_type {};
+////        }
+//
+//
+//    }
 
     
     auto operator= (T&& t) -> auto&
@@ -187,13 +272,12 @@ union vari <I, construct, T, U...>
     {
 //        if constexpr (not is_trivially_destructible_v <P>)
 //            _t.~T();
-        bool active = true;
         
-        if constexpr (not is_trivially_destructible_v<T>)
-        {
-            if (active)
-                value.~T ();
-        }
+//        if constexpr (not is_trivially_destructible_v<T>)
+//        {
+//            if (active)
+//                value.~T ();
+//        }
         return _tail = forward <P> (p);
     }
     
@@ -208,12 +292,24 @@ union vari <I, construct, T, U...>
     ~vari ()
     {
         
-        cout << "~kiss ()" << endl;
+        cout << "~vari " << "[" << I << "]" << " ()" << endl;
+    }
+    
+    template <int i>
+    string print () const
+    {
+        if constexpr (I < i)
+            return "1 " + _tail.template print <i> ();
+        
+        else if constexpr (I == i)
+            return "2 " + _tail.template print <i> ();
+        else if constexpr (I > i)
+            return "0 " + _tail.template print <i> ();
     }
 };
 
-template <int I, int construct, typename T>
-union vari <I, construct, T>
+template <int I, typename T>
+union vari <I, T>
 {
     using value_type = T;
     
@@ -225,9 +321,13 @@ union vari <I, construct, T>
     
     
     vari ()
-        requires (construct == I)
     {
-            new (&value) T {};
+        
+    }
+    
+    vari (T&& t) : value {forward <T> (t)}
+    {
+        
     }
     
     template <int i, typename P>
@@ -235,6 +335,18 @@ union vari <I, construct, T>
     auto init () -> void
     {
         
+    }
+    
+    template <int from, int to>
+    auto deinit_tail () -> void
+    {
+//        value.~T ();
+    }
+    
+    template <int i>
+    auto deinit_value () -> void
+    {
+        value.~T ();
     }
     
     template <int i>
@@ -261,7 +373,16 @@ union vari <I, construct, T>
     
     ~vari ()
     {
-
+        cout << "~vari " << "[" << I << "]" << " ()" << endl;
+    }
+    
+    template <int i>
+    string print () const
+    {
+        if constexpr (I > i)
+            return "0";
+        else if constexpr (I == i)
+            return "2";
     }
 };
 
