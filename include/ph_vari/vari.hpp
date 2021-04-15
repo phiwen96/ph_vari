@@ -52,16 +52,12 @@ struct var
         }
 //        return false;
     }
+    
+    using vari_type = vari<0, T, U...>;
 
-    vari <0, T, U...> value_;
+    vari_type value_;
     
     var () = default;
-    
-    template <typename P>
-    var (P&& arg) : value_ {forward <P> (arg)}, active {type_list_t <T, U...>::template find <P>}
-    {
-//        cout << active << endl;
-    }
     
     template <typename... B>
     var (var <B...> const& other) : value_ {[&other]()->auto const& {
@@ -69,13 +65,38 @@ struct var
         {
         #define X0(z, i, arg) \
             case i: \
-                return other.template get <i> (); \
+                return other.value_.template get <i> ().value; \
                 break;
         BOOST_PP_REPEAT (MAX, X0, _)
         }
     }}
     {
+        cout << "hi" << endl;
         active = other.active;
+    }
+    
+    template <typename P>
+    var (P&& arg) : value_ {forward <P> (arg)}, active {type_list_t <T, U...>::template find <P>}
+    {
+        
+    }
+    
+    template <typename... B>
+    var (var <B...> && other) : var ()
+    {
+        switch (other.active)
+        {
+        #define ALIAS(i) typename var <B...>::vari_type::template get_by_index <i>
+        #define X0(z, i, arg) \
+            case i: \
+                if constexpr (is_same_v <ALIAS (i), decltype (value_.template get <ALIAS (i)> ().value)> and requires (ALIAS (i)& a0, ALIAS (i)& a1){swap (a0, a1);}) \
+                { \
+                    active = get_vari_index_from_type <ALIAS (i)>; \
+                    swap (value_.template get <ALIAS (i)> ().value, other.value_.template get <i> ().value); \
+                } \
+                break;
+        BOOST_PP_REPEAT (MAX, X0, _)
+        }
     }
     
     template <typename A>
@@ -143,10 +164,13 @@ struct var
         requires (type_list_t <T, U...>::template find <P> >= 0);
     };
     
+//    template <int i>
+//    using vari_type =
+    
     template <typename P>
-    requires requires () {
-        requires (vari_value_type_exists <P>);
-    }
+//    requires requires () {
+//        requires (vari_value_type_exists <P>);
+//    }
     inline static constexpr int get_vari_index_from_type = type_list_t <T, U...>::template find <P>;
     
     
@@ -424,13 +448,22 @@ union vari <I, T, U...>
     tail_type _tail;
     
     template <typename P>
-    using type = conditional_t <is_same_v <P, T>, T, typename tail_type::template type <P>>;
+    using get_by_type = conditional_t <is_same_v <P, T>, T, typename tail_type::template get_by_type <P>>;
+    
+    template <int i>
+    using get_by_index = conditional_t <i == I, value_type, typename tail_type::template get_by_index <i>>;
+  
+
     
 //    vari ()
 //    {
 //
 //    }
   
+    vari ()
+    {
+        
+    }
     
     vari (T&& t) : value {forward <T> (t)}
     {
@@ -608,9 +641,11 @@ union vari <I, T>
     using value_type = T;
     
     template <typename P>
-    requires (is_same_v <T, P>)
-    using type = T;
+//    requires (is_same_v <T, P>)
+    using get_by_type = T;
     
+    template <int i>
+    using get_by_index = value_type;
     
     emptyy _;
     T value;

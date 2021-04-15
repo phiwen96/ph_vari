@@ -8,9 +8,9 @@ struct A
 {
     inline static int alive {0};
     
-    A (A&&){++alive; cout << "A (A&&)" << endl;}
-    A (){++alive; cout << "A ()" << endl;}
-    ~A (){--alive; cout << "~A ()" << endl;}
+    A (A&&){++alive; /*cout << "A (A&&)" << endl;*/}
+    A (){++alive; /*cout << "A ()" << endl;*/}
+    ~A (){--alive; /*cout << "~A ()" << endl;*/}
 
     A& operator= (A other)
     {
@@ -51,6 +51,7 @@ struct D
 
 TEST_CASE ("0")
 {
+    return;
     var <D, int, C, A> v0 {int {4}};
     
     REQUIRE (type <int> == v0);
@@ -61,12 +62,32 @@ TEST_CASE ("0")
 }
 
 
-TEST_CASE ("call value destructor when destructing")
+TEST_CASE ("call actives (if active) destructor")
 {
+    return;
     A::alive = 0;
     
     {
         var <D, int, C, A> v0 {A {}};
+    }
+    
+    REQUIRE (A::alive == 0);
+}
+
+TEST_CASE ("")
+{
+    var <D, int, C, A> v0 {int {3}};
+    REQUIRE (v0.get <int> () == 3);
+}
+
+TEST_CASE ("call moved vars active destructor")
+{
+//    return;
+    A::alive = 0;
+    
+    {
+        var <D, int, C, A> v0 {var <int, double, string> {int {2}}};
+        cout << v0.get<int>() << endl;
     }
     
     REQUIRE (A::alive == 0);
