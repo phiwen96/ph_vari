@@ -30,15 +30,77 @@ struct var
     inline static constexpr int size = sizeof... (U) + 1;
     int active {-1};
 
-    vari <0, T, U...> value;
+    vari <0, T, U...> value_;
     
     var () = default;
     
     template <typename P>
-    var (P&& arg) : value {forward <P> (arg)}, active {type_list_t <T, U...>::template find <P>}
+    var (P&& arg) : value_ {forward <P> (arg)}, active {type_list_t <T, U...>::template find <P>}
     {
 //        cout << active << endl;
     }
+    
+    template <typename... B>
+    var (var <B...> const& other) : value_ {[&other]()->auto const& {
+        switch (other.active)
+        {
+        #define X0(z, i, arg) \
+            case i: \
+                return other.template get <i> (); \
+                break;
+        BOOST_PP_REPEAT (MAX, X0, _)
+        }
+    }}
+    {
+        active = other.active;
+    }
+    
+    template <typename A>
+    auto get () -> auto&
+    {
+        return value_.template get <A> ().value;
+    }
+    
+    template <typename A>
+    operator A () const
+    {
+        switch (active)
+        {
+        #define X(_, i, __) \
+            case i: \
+                if constexpr (is_convertible_v <typename type_list_t <T, U...>::template type_at <i>, A>) \
+                    return value_.template get <i> ().value; \
+                else \
+                    throw runtime_error ("not convertible"); \
+                break;
+                
+            BOOST_PP_REPEAT (MAX, X, _)
+        #undef X
+        }
+    }
+    
+    template <typename A>
+    operator A & ()
+    {
+        switch (active)
+        {
+        #define X(_, i, __) \
+            case i: \
+                if constexpr (is_convertible_v <typename type_list_t <T, U...>::template type_at <i>, A>) \
+                    return value_.template get <i> ().value; \
+                else \
+                    throw runtime_error ("not convertible"); \
+                break;
+                
+            BOOST_PP_REPEAT (MAX, X, _)
+        #undef X
+        }
+    }
+    
+    
+    
+    
+    
     int af = requires {
         requires (1 == 1);
     };
@@ -92,7 +154,7 @@ struct var
         {
             if constexpr (requires (P& pp){pp = forward <P> (p);})
             {
-                return value.template get <get_vari_index_from_type <P>> ().value = forward <P> (p);
+                return value_.template get <get_vari_index_from_type <P>> ().value = forward <P> (p);
             } else
             {
                 throw runtime_error ("not assignable");
@@ -101,20 +163,21 @@ struct var
         {
             switch (active)
             {
-                #define X(n) \
-case n: \
-                    value.template deinit_value <n> (); \
-break;
+            #define X(n) \
+                case n: \
+                    value_.template deinit_value <n> (); \
+                break;
+                    
                     FOR (MAX, X)
-                #undef X
+            #undef X
             }
-            auto& a = value.template get <get_vari_index_from_type <P>> ();
+            auto& a = value_.template get <get_vari_index_from_type <P>> ();
             new (&a.value) P {forward <P> (p)};
             active = get_vari_index_from_type <P>;
             return a.value;
         } else
         {
-            auto& a = value.template get <get_vari_index_from_type <P>> ();
+            auto& a = value_.template get <get_vari_index_from_type <P>> ();
             new (&a.value) P {forward <P> (p)};
             active = get_vari_index_from_type <P>;
             return a.value;
@@ -127,10 +190,10 @@ break;
     auto operator= (var <P, Q...> const & other)
     {
         #define if_left_active_equal_comparible_to_right_active(lhs, rhs) \
-            return value.template get <lhs> ().value = other.value.template get <rhs> ().value;
+            return value_.template get <lhs> ().value = other.value_.template get <rhs> ().value;
                 
         #define IF_TRUE(lhs, rhs) \
-            if constexpr (requires {value.template get <lhs> ().value = other.value.template get <rhs> ().value;}) \
+            if constexpr (requires {value_.template get <lhs> ().value = other.value_.template get <rhs> ().value;}) \
             { \
                 if_left_active_equal_comparible_to_right_active (lhs, rhs) \
             }
@@ -163,52 +226,32 @@ break;
                 break;
                 
                 BOOST_PP_REPEAT (MAX, X, is_left_active_equal_comparible_to_right_active)
+                
+            #undef if_left_active_equal_comparible_to_right_active
+            #undef IF_TRUE
+            #undef IF_FALSE
+            #undef is_left_active_equal_comparible_to_right_active
             #undef X
-//            FOR(10, X)
         }
-        
-        
-        
-
-        cout << "hora" << endl;
-//        return get_current().value = other.get_current.value ();
-//#define X(n) \
-//return value.template get <
-//        SWITCH_CASE (active)
     }
     
     template <typename... B>
     friend void swap (var & lhs, var <B...> & rhs)
     {
         using std::swap;
-        switch (lhs.active)
-        {
-            case 0:
-                switch (rhs.acrive)
-                {
-                    case 0:
-                        if constexpr (requires {swap (lhs.var.template get <lhs> (), rhs.var.template get <rhs> ());})
-                        {
-                            swap (lhs.var.template get <lhs> (), rhs.var.template get <rhs> ());
-                        } else
-                        {
-                            throw runtime_error ("not swappable");
-                        }
-                        break;
-                }
-        }
         
-    #define X1(z, rhs, lhs) \
+    #define X1(z, rhs_i, lhs_i) \
         case rhs: \
-if constexpr (requires {swap (lhs.var.template get <lhs> (), rhs.var.template get <rhs> ());}) \
-        { \
-            swap (lhs.var.template get <lhs> (), rhs.var.template get <rhs> ()); \
-        } else \
-        { \
-            throw runtime_error ("not swappable"); \
-        } \
+            if constexpr (requires {swap (lhs.value.template get <lhs_i> (), rhs.value.template get <rhs_i> ());}) \
+            { \
+                swap (lhs.value.template get <lhs_i> (), rhs.value.template get <rhs_i> ()); \
+            } else \
+            { \
+                throw runtime_error ("not swappable"); \
+            } \
         break;
         
+    
         switch (lhs.active)
         {
         #define X0(z, n, arg) \
@@ -218,7 +261,10 @@ if constexpr (requires {swap (lhs.var.template get <lhs> (), rhs.var.template ge
                     BOOST_PP_REPEAT (MAX, X1, n) \
                 } \
             break;
-                BOOST_PP_REPEAT (MAX, X0, _)
+                BOOST_PP_REPEAT (MAX, X0, k)
+        #undef X1
+        #undef X0
+
         }
     }
 
@@ -228,10 +274,10 @@ if constexpr (requires {swap (lhs.var.template get <lhs> (), rhs.var.template ge
         swap (*this, other);
         return *this;
         #define if_left_active_equal_comparible_to_right_active(lhs, rhs) \
-            return value.template get <lhs> ().value = move (other.value.template get <rhs> ().value);
+            return value_.template get <lhs> ().value = move (other.value_.template get <rhs> ().value);
                 
         #define IF_TRUE(lhs, rhs) \
-            if constexpr (requires {value.template get <lhs> ().value = other.value.template get <rhs> ().value;}) \
+            if constexpr (requires {value_.template get <lhs> ().value = other.value_.template get <rhs> ().value;}) \
             { \
                 if_left_active_equal_comparible_to_right_active (lhs, rhs) \
             }
@@ -323,6 +369,9 @@ union vari <I, T, U...>
     value_type value;
     tail_type _tail;
     
+    template <typename P>
+    using type = conditional_t <is_same_v <P, T>, T, typename tail_type::template type <P>>;
+    
 //    vari ()
 //    {
 //
@@ -398,10 +447,10 @@ union vari <I, T, U...>
     template <typename P>
     auto get () -> auto&
     {
-        if constexpr (not not is_same_v <T, P>)
+        if constexpr (not is_same_v <T, P>)
             return _tail.template get <P> ();
         else
-        return *this;
+            return *this;
     }
     
     template <int i>
@@ -504,6 +553,9 @@ union vari <I, T>
 {
     using value_type = T;
     
+    template <typename P>
+    requires (is_same_v <T, P>)
+    using type = T;
     
     
     emptyy _;
