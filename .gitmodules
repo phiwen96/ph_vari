@@ -10,3 +10,9 @@
 [submodule "dependencies/ph_time"]
 	path = dependencies/ph_time
 	url = https://github.com/phiwen96/ph_time
+[submodule "build/dependencies/ph_type"]
+	path = build/dependencies/ph_type
+	url = https://github.com/phiwen96/ph_type
+[submodule "dependencies/ph_type"]
+	path = dependencies/ph_type
+	url = https://github.com/phiwen96/ph_type
