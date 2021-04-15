@@ -6,9 +6,11 @@ using namespace std;
 
 struct A
 {
-    A (A&&){cout << "A (A&&)" << endl;}
-    A (){cout << "A ()" << endl;}
-    ~A (){cout << "~A ()" << endl;}
+    inline static int alive {0};
+    
+    A (A&&){++alive; cout << "A (A&&)" << endl;}
+    A (){++alive; cout << "A ()" << endl;}
+    ~A (){--alive; cout << "~A ()" << endl;}
 
     A& operator= (A other)
     {
@@ -47,8 +49,34 @@ struct D
 //    var <A, int, C, D> v3 {D {}};
 //}
 
+TEST_CASE ("0")
+{
+    var <D, int, C, A> v0 {int {4}};
+    
+    REQUIRE (type <int> == v0);
+    REQUIRE (not (type <C> == v0));
+    
+    REQUIRE (type <D> != v0);
+    REQUIRE (not (type <int> != v0));
+}
+
+
+TEST_CASE ("call value destructor when destructing")
+{
+    A::alive = 0;
+    
+    {
+        var <D, int, C, A> v0 {A {}};
+    }
+    
+    REQUIRE (A::alive == 0);
+}
+
+
 TEST_CASE ("1")
 {
+    
+    return;
     var <D, int, C, A> v0 {int {4}};
     assert (v0.get <int> () == 4);
     v0.get <int> () = 3;

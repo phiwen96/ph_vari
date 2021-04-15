@@ -3,6 +3,7 @@
 #include <ph_type_list/type_list.hpp>
 #include <ph_macros/macros.hpp>
 #include "vari_macros.hpp"
+#include <ph_type/type.hpp>
 
 
 
@@ -29,6 +30,28 @@ struct var
     #define MAX 10
     inline static constexpr int size = sizeof... (U) + 1;
     int active {-1};
+    
+    template <typename P>
+    constexpr auto same_type () const -> bool
+    {
+        if (active < 0)
+        {
+            return false;
+        }
+        switch (active)
+        {
+        #define X(_, i, __) \
+            case i: \
+                return is_same_v <typename type_list_t <T, U...>::template type_at <i>, P>; \
+                break;
+                
+        BOOST_PP_REPEAT (MAX, X, _)
+        #undef X
+            default:
+                throw runtime_error ("whaaat");
+        }
+//        return false;
+    }
 
     vari <0, T, U...> value_;
     
@@ -64,6 +87,11 @@ struct var
     template <typename A>
     operator A () const
     {
+        if (active < 0)
+        {
+            throw runtime_error ("not active!");
+        }
+        
         switch (active)
         {
         #define X(_, i, __) \
@@ -82,6 +110,11 @@ struct var
     template <typename A>
     operator A & ()
     {
+        if (active < 0)
+        {
+            throw runtime_error ("not active!");
+        }
+        
         switch (active)
         {
         #define X(_, i, __) \
@@ -94,6 +127,7 @@ struct var
                 
             BOOST_PP_REPEAT (MAX, X, _)
         #undef X
+            
         }
     }
     
@@ -336,7 +370,7 @@ struct var
         {
             #define X(n) \
                 case n: \
-                os << v.value.template print <n> (); \
+                os << v.value_.template print <n> (); \
                 break;
 
                             FOR (MAX, X)
@@ -345,6 +379,26 @@ struct var
 
         return os;
     }
+    
+    ~var ()
+    {
+        if (active < 0)
+        {
+            return;
+        }
+        
+        switch (active)
+        {
+        #define X(_, i, __) \
+            case i: \
+                value_.template get <i> ().value.~decltype(value_.template get <i> ().value)(); \
+                break;
+                
+                BOOST_PP_REPEAT (MAX, X, _)
+        #undef X
+        }
+    }
+    
     #undef MAX
 };
 
