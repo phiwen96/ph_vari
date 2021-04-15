@@ -41,6 +41,7 @@ struct D
 
 TEST_CASE("is not class")
 {
+
 //    cout << sizeof (variant <int, double, char, string>) << endl;
 //    cout << sizeof (var <int, double, char, string>) << endl;
 //    int max = 10000000;
@@ -62,7 +63,9 @@ TEST_CASE("is not class")
     }
     
     
-    var <A, int, C, D> k {int {2}};
+//    var <A, int, C, D> k {C {}};
+    var <A, int, C, D> k {int {4}};
+    cout << k << endl;
     var <A, C, B, int> k2 {int{7}};
     k = k2;
     return;

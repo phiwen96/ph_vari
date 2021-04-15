@@ -2,6 +2,7 @@
 #define VARI_HPP
 #include <ph_type_list/type_list.hpp>
 #include <ph_macros/macros.hpp>
+#include "vari_macros.hpp"
 
 
 
@@ -75,6 +76,7 @@ struct var
     
     
     
+    
     /**
      set current value equal to
      */
@@ -82,9 +84,6 @@ struct var
     requires (vari_value_type_exists <P>)
     auto operator= (P&& p) -> auto&
     {
-        
-        cout << "lkmk" << endl;
-        
         /**
          If active, delete current vari and all before (?)
          */
@@ -103,8 +102,10 @@ struct var
             switch (active)
             {
                 #define X(n) \
-                    value.template deinit_value <n> ();
-                    SWITCH_CASE (MAX)
+case n: \
+                    value.template deinit_value <n> (); \
+break;
+                    FOR (MAX, X)
                 #undef X
             }
             auto& a = value.template get <get_vari_index_from_type <P>> ();
@@ -123,33 +124,47 @@ struct var
     
     
     template <typename P, typename... Q>
-    auto operator= (var <P, Q...>& other)
+    auto operator= (var <P, Q...> const & other)
     {
-        
-#define DECL2(z, n, k) \
-    case n: \
-        if constexpr (requires {value.template get <k> ().value = other.value.template get <n> ().value;}) \
-        { \
-            cout << "tju" << endl; \
-            value.template get <k> ().value = other.value.template get <n> ().value; \
-        } else \
-        { \
-            throw runtime_error ("not assignable!"); \
-        } \
-        break;
+        #define if_left_active_equal_comparible_to_right_active(lhs, rhs) \
+            return value.template get <lhs> ().value = other.value.template get <rhs> ().value;
+                
+        #define IF_TRUE(lhs, rhs) \
+            if constexpr (requires {value.template get <lhs> ().value = other.value.template get <rhs> ().value;}) \
+            { \
+                if_left_active_equal_comparible_to_right_active (lhs, rhs) \
+            }
+                
+        #define IF_FALSE(lhs, rhs) \
+            else \
+            { \
+               throw runtime_error ("not doable!"); \
+            } \
+
+                
+        #define is_left_active_equal_comparible_to_right_active(z, rhs, lhs) \
+            case rhs: \
+                IF_TRUE (lhs, rhs) \
+                IF_FALSE (lhs, rhs) \
+                break;
         //                cout << "hi" << endl, \
 //                cout << "no" << endl);
 
 
+
         switch (active)
         {
-            #define X(n) \
+            #define X(z, lhs, nested) \
+                case lhs: \
                 switch (other.active) \
                 { \
-                    SWITCH_CASE_2 (DECL2, 10, n) \
-                }
+                    BOOST_PP_REPEAT (MAX, nested, lhs) \
+                } \
+                break;
                 
-            SWITCH_CASE(10)
+                BOOST_PP_REPEAT (MAX, X, is_left_active_equal_comparible_to_right_active)
+            #undef X
+//            FOR(10, X)
         }
         
         
@@ -162,6 +177,109 @@ struct var
 //        SWITCH_CASE (active)
     }
     
+    template <typename... B>
+    friend void swap (var & lhs, var <B...> & rhs)
+    {
+        using std::swap;
+        switch (lhs.active)
+        {
+            case 0:
+                switch (rhs.acrive)
+                {
+                    case 0:
+                        if constexpr (requires {swap (lhs.var.template get <lhs> (), rhs.var.template get <rhs> ());})
+                        {
+                            swap (lhs.var.template get <lhs> (), rhs.var.template get <rhs> ());
+                        } else
+                        {
+                            throw runtime_error ("not swappable");
+                        }
+                        break;
+                }
+        }
+        
+    #define X1(z, rhs, lhs) \
+        case rhs: \
+if constexpr (requires {swap (lhs.var.template get <lhs> (), rhs.var.template get <rhs> ());}) \
+        { \
+            swap (lhs.var.template get <lhs> (), rhs.var.template get <rhs> ()); \
+        } else \
+        { \
+            throw runtime_error ("not swappable"); \
+        } \
+        break;
+        
+        switch (lhs.active)
+        {
+        #define X0(z, n, arg) \
+            case n: \
+                switch (rhs.active) \
+                { \
+                    BOOST_PP_REPEAT (MAX, X1, n) \
+                } \
+            break;
+                BOOST_PP_REPEAT (MAX, X0, _)
+        }
+    }
+
+    template <typename P, typename... Q>
+    auto operator= (var <P, Q...>&& other)
+    {
+        swap (*this, other);
+        return *this;
+        #define if_left_active_equal_comparible_to_right_active(lhs, rhs) \
+            return value.template get <lhs> ().value = move (other.value.template get <rhs> ().value);
+                
+        #define IF_TRUE(lhs, rhs) \
+            if constexpr (requires {value.template get <lhs> ().value = other.value.template get <rhs> ().value;}) \
+            { \
+                if_left_active_equal_comparible_to_right_active (lhs, rhs) \
+            }
+                
+        #define IF_FALSE(lhs, rhs) \
+            else \
+            { \
+               throw runtime_error ("not doable!"); \
+            } \
+
+                
+        #define is_left_active_equal_comparible_to_right_active(z, rhs, lhs) \
+            case rhs: \
+                IF_TRUE (lhs, rhs) \
+                IF_FALSE (lhs, rhs) \
+                break;
+        //                cout << "hi" << endl, \
+//                cout << "no" << endl);
+
+
+
+        switch (active)
+        {
+            #define X(z, lhs, nested) \
+                case lhs: \
+                switch (other.active) \
+                { \
+                    BOOST_PP_REPEAT (MAX, nested, lhs) \
+                } \
+                break;
+                
+                BOOST_PP_REPEAT (MAX, X, is_left_active_equal_comparible_to_right_active)
+            #undef X
+//            FOR(10, X)
+        }
+        
+        
+        
+
+        cout << "hora" << endl;
+//        return get_current().value = other.get_current.value ();
+//#define X(n) \
+//return value.template get <
+//        SWITCH_CASE (active)
+    }
+
+    
+    
     
     
     friend ostream& operator<< (ostream& os, var const& v)
@@ -170,11 +288,13 @@ struct var
         
         switch (v.active)
         {
-#define X(n) \
-os << v.value.template print <n> ();
+            #define X(n) \
+                case n: \
+                os << v.value.template print <n> (); \
+                break;
 
-    SWITCH_CASE (MAX)
-#undef X
+                            FOR (MAX, X)
+            #undef X
         }
 
         return os;
@@ -188,7 +308,6 @@ os << v.value.template print <n> ();
 //    vari <T> value;
 //
 //};
-
 
 
 
@@ -266,15 +385,8 @@ union vari <I, T, U...>
     {
         value.~T ();
     }
-    
-//    template <int i>
-//    requires (i != I)
-//    auto get () -> auto&
-//    {
-//        return _tail.template get <i> ();
-//    }
+
     template <int i>
-//    requires (i == I)
     auto get () -> auto&
     {
         if constexpr (i != I)
@@ -282,16 +394,8 @@ union vari <I, T, U...>
         else
             return *this;
     }
-    
-//    template <typename P>
-//    requires (not is_same_v <T, P>)
-//    auto get () -> auto&
-//    {
-//        return _tail.template get <P> ();
-//    }
-    
+
     template <typename P>
-//    requires (is_same_v <T, P>)
     auto get () -> auto&
     {
         if constexpr (not not is_same_v <T, P>)
@@ -300,25 +404,29 @@ union vari <I, T, U...>
         return *this;
     }
     
-//    template <int i>
-//    auto init_tail () -> void
-//    {
-////        if constexpr (i > I)
-////        {
-//////            new (&_tail) tail_type {};
-////        }
-//
-//
-//    }
+    template <int i>
+    auto get () const -> auto const&
+    {
+        if constexpr (i != I)
+            return _tail.template get <i> ();
+        else
+            return *this;
+    }
 
+    template <typename P>
+    auto get () const -> auto const&
+    {
+        if constexpr (not not is_same_v <T, P>)
+            return _tail.template get <P> ();
+        else
+        return *this;
+    }
     
     auto operator= (T&& t) -> auto&
     {
         value = forward <decltype (t)> (t);
         return value;
     }
-    
-    
     
     void set_equal (T&& t, int i)
     {
@@ -340,7 +448,6 @@ union vari <I, T, U...>
     {
         
     }
-    
     
     constexpr auto clear_value () -> void
     {
@@ -434,15 +541,25 @@ union vari <I, T>
     }
     
     template <int i>
-//    requires (i == I)
     auto get () -> auto&
     {
         return *this;
     }
 
     template <typename P>
-    requires (is_same_v <T, P>)
     auto get () -> auto&
+    {
+        return *this;
+    }
+    
+    template <int i>
+    auto get () const -> auto const&
+    {
+        return *this;
+    }
+
+    template <typename P>
+    auto get () const -> auto const&
     {
         return *this;
     }
