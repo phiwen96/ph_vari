@@ -19,61 +19,74 @@ inline static constexpr transform_t <T> transform {};
 
 
 
+template <typename...>
+struct var;
+
+template <typename... T>
+consteval bool is_var_v (var <T> const&... v) {return true;}
+
+template <typename T>
+consteval bool is_var_v (T const& v) {return false;}
+
+template <typename T>
+constexpr bool is_var = is_var_v (declval<T>());
 
 
 template <int, typename...>
 union vari {};
 
 template <typename T, typename... U>
-struct var
+//requires requires () {
+//
+//}
+struct var <T, U...>
 {
     #define MAX 30
     inline static constexpr int size = sizeof... (U) + 1;
-    int active {-1};
+    int active_ {-1};
     
-    template <typename P>
-    constexpr auto same_type () const -> bool
-    {
-        if (active < 0)
-        {
-            return false;
-        }
-        switch (active)
-        {
-        #define X(_, i, __) \
-            case i: \
-                return is_same_v <typename type_list_t <T, U...>::template type_at <i>, P>; \
-                break;
-                
-        BOOST_PP_REPEAT (MAX, X, _)
-        #undef X
-            default:
-                throw runtime_error ("whaaat");
-        }
-//        return false;
-    }
+
+    
     
     using vari_type = vari<0, T, U...>;
 
     vari_type value_;
     
-    var () = default;
-    
-    var (var&& other) : value_ {other.active, move (other.value_)}
+    auto active () const -> int
     {
-        cout << "tjo" << endl;
+        return active_;
     }
     
-    var (var const& other) : value_ {other.active, other.value_}
+    var () = default;
+    
+    
+    var (var&& other)
+        requires requires {
+            requires (is_move_constructible_v<T> and (is_move_constructible_v<U> and ...));
+        }
+        : var ()
     {
-        cout << "mohaha" << endl;
+        swap (*this, other);
+    }
+    
+    
+    var (var const& other)
+        requires requires {
+            requires (is_copy_constructible_v<T> and (is_copy_constructible_v<U> and ...));
+        }
+        : value_ {other.active_, other.value_}, active_ {other.active_}
+    {
+//        cout << "mohaha" << endl;
     }
     
     auto operator= (var const& other) -> var&
+        requires requires () {
+            requires (is_copy_assignable_v<T> and (is_copy_assignable_v<U> and ...));
+        }
     {
-        if (active != other.active)
+        if (active_ != other.active_)
         {
-            switch (active)
+            switch (active_)
             {
     #define X(_, i, __) \
     case i: \
@@ -84,8 +97,8 @@ struct var
             }
         }
         
-        active = other.active;
-        switch (active)
+        active_ = other.active_;
+        switch (active_)
         {
 #define X(_, i, __) \
 case i: \
@@ -101,10 +114,13 @@ break;
     }
     
     auto operator= (var&& other) -> var&
+        requires requires () {
+            requires (is_move_assignable_v<T> and (is_move_assignable_v<U> and ...));
+        }
     {
-        if (active != other.active)
+        if (active_ != other.active_)
         {
-            switch (active)
+            switch (active_)
             {
     #define X(_, i, __) \
     case i: \
@@ -115,8 +131,8 @@ break;
             }
         }
         
-        active = other.active;
-        switch (active)
+        active_ = other.active_;
+        switch (active_)
         {
 #define X(_, i, __) \
 case i: \
@@ -134,8 +150,10 @@ break;
     
     
     template <typename... B>
-    var (var <B...> const& other) : value_ {[&other]()->auto const& {
-        switch (other.active)
+    var (var <B...> const& other) requires requires {
+        requires false;
+    } : value_ {[&other]()->auto const& {
+        switch (other.active_)
         {
         #define X0(z, i, arg) \
             case i: \
@@ -146,27 +164,43 @@ break;
     }}
     {
         cout << "hi" << endl;
-        active = other.active;
+        active_ = other.active_;
     }
+    
+    
+    
     
     template <typename P>
-    var (P&& arg) : value_ {}, active {type_list_t <T, U...>::template find <P>}
+    var (P&& arg)
+    requires requires {
+        requires false;
+    requires type_list_t <T, U...>::template find <P> >= 0;
+    forward <P> (arg);
+    P {forward <P> (arg)};
+    }
+    : value_ {forward <P> (arg)}, active_ {type_list_t <T, U...>::template find <P>}
     {
-        new (&value_.template get <type_list_t <T, U...>::template find <P>> ().value) decltype (value_.template get <type_list_t <T, U...>::template find <P>> ().value) {forward <P> (arg)};
+//        new (&value_.template get <type_list_t <T, U...>::template find <P>> ().value) decltype (value_.template get <type_list_t <T, U...>::template find <P>> ().value) {forward <P> (arg)};
     }
     
+    
+    
     template <typename... B>
-    var (var <B...> && other) : var ()
+    var (var <B...> && other)
+    requires requires {
+        requires false;
+    }
+    : var ()
     {
-        switch (other.active)
+        switch (other.active_)
         {
         #define ALIAS(i) typename var <B...>::vari_type::template get_by_index <i>
         #define X(z, i, arg) \
             case i: \
                 if constexpr (is_same_v <ALIAS (i), decltype (value_.template get <ALIAS (i)> ().value)> and requires (ALIAS (i)& a0, ALIAS (i)& a1){swap (a0, a1);}) \
                 { \
-                    active = get_vari_index_from_type <ALIAS (i)>; \
-                    swap (value_.template get <ALIAS (i)> ().value, other.value_.template get <i> ().value); \
+                    active_ = get_vari_index_from_type <ALIAS (i)>; \
+new (&value_.template get <ALIAS (i)> ().value) ALIAS (i) {move (other.value_.template get <i> ().value)}; \
                 } \
                 break;
         BOOST_PP_REPEAT (MAX, X, _)
@@ -182,14 +216,17 @@ break;
     }
     
     template <typename A>
+    requires requires {
+        requires false;
+    }
     operator A const& () const
     {
-        if (active < 0)
+        if (active_ < 0)
         {
-            throw runtime_error ("not active!");
+            throw runtime_error ("not active_!");
         }
         
-        switch (active)
+        switch (active_)
         {
         #define X(_, i, __) \
             case i: \
@@ -205,14 +242,17 @@ break;
     }
     
     template <typename A>
+    requires requires {
+        requires false;
+    }
     operator A & ()
     {
-        if (active < 0)
+        if (active_ < 0)
         {
-            throw runtime_error ("not active!");
+            throw runtime_error ("not active_!");
         }
         
-        switch (active)
+        switch (active_)
         {
         #define X(_, i, __) \
             case i: \
@@ -229,14 +269,17 @@ break;
     }
     
     template <typename A>
+    requires requires {
+        requires false;
+    }
     operator A && ()
     {
-        if (active < 0)
+        if (active_ < 0)
         {
-            throw runtime_error ("not active!");
+            throw runtime_error ("not active_!");
         }
         
-        switch (active)
+        switch (active_)
         {
         #define X(_, i, __) \
             case i: \
@@ -281,18 +324,18 @@ break;
     
     
     
-    template <typename P>
-    requires (vari_value_type_exists <P>)
-    auto operator= (transform_t <P> const&) -> auto&
-    {
-        /**
-         vari <int, string> v = int {2};
-         v = "hej"   ERROR
-         
-         v = transform <string>;
-         v = "hej";
-         */
-    }
+//    template <typename P>
+//    requires (vari_value_type_exists <P>)
+//    auto operator= (transform_t <P> const&) -> auto&
+//    {
+//        /**
+//         vari <int, string> v = int {2};
+//         v = "hej"   ERROR
+//
+//         v = transform <string>;
+//         v = "hej";
+//         */
+//    }
     
     
     
@@ -301,14 +344,17 @@ break;
      set current value equal to
      */
     template <typename P>
-    requires (vari_value_type_exists <P>)
+//    requires (vari_value_type_exists <P>)
+    requires requires {
+        requires false;
+    }
     auto operator= (P&& p) -> auto&
     {
         /**
-         If active, delete current vari and all before (?)
+         If active_, delete current vari and all before (?)
          */
 //        value.template deinit_value <0> ();
-        if (active == get_vari_index_from_type <P>)
+        if (active_ == get_vari_index_from_type <P>)
         {
             if constexpr (requires (P& pp){pp = forward <P> (p);})
             {
@@ -317,9 +363,9 @@ break;
             {
                 throw runtime_error ("not assignable");
             }
-        } else if (active >= 0)
+        } else if (active_ >= 0)
         {
-            switch (active)
+            switch (active_)
             {
             #define X(n) \
                 case n: \
@@ -331,13 +377,13 @@ break;
             }
             auto& a = value_.template get <get_vari_index_from_type <P>> ();
             new (&a.value) P {forward <P> (p)};
-            active = get_vari_index_from_type <P>;
+            active_ = get_vari_index_from_type <P>;
             return a.value;
         } else
         {
             auto& a = value_.template get <get_vari_index_from_type <P>> ();
             new (&a.value) P {forward <P> (p)};
-            active = get_vari_index_from_type <P>;
+            active_ = get_vari_index_from_type <P>;
             return a.value;
         }
     }
@@ -345,17 +391,23 @@ break;
     
     
     template <typename P, typename... Q>
+    requires requires {
+        requires false;
+    }
     auto operator= (var <P, Q...> const & other) -> var&
+        requires requires {
+            requires false;
+        }
     {
-        #define if_left_active_equal_comparible_to_right_active(lhs, rhs) \
-        active = lhs; \
+        #define if_left_active__equal_comparible_to_right_active_(lhs, rhs) \
+        active_ = lhs; \
         value_.template get <lhs> ().value = other.value_.template get <rhs> ().value; \
         return *this;
                 
         #define IF_TRUE(lhs, rhs) \
             if constexpr (requires {value_.template get <lhs> ().value = other.value_.template get <rhs> ().value;}) \
             { \
-                if_left_active_equal_comparible_to_right_active (lhs, rhs) \
+                if_left_active__equal_comparible_to_right_active_ (lhs, rhs) \
             }
                 
         #define IF_FALSE(lhs, rhs) \
@@ -365,7 +417,7 @@ break;
             } \
 
                 
-        #define is_left_active_equal_comparible_to_right_active(z, rhs, lhs) \
+        #define is_left_active__equal_comparible_to_right_active_(z, rhs, lhs) \
             case rhs: \
                 IF_TRUE (lhs, rhs) \
                 IF_FALSE (lhs, rhs) \
@@ -375,36 +427,74 @@ break;
 
 
 
-        switch (active)
+        switch (active_)
         {
             #define X(z, lhs, nested) \
                 case lhs: \
-                switch (other.active) \
+                switch (other.active_) \
                 { \
                     BOOST_PP_REPEAT (MAX, nested, lhs) \
                 } \
                 break;
                 
-                BOOST_PP_REPEAT (MAX, X, is_left_active_equal_comparible_to_right_active)
+                BOOST_PP_REPEAT (MAX, X, is_left_active__equal_comparible_to_right_active_)
                 
-            #undef if_left_active_equal_comparible_to_right_active
+            #undef if_left_active__equal_comparible_to_right_active_
             #undef IF_TRUE
             #undef IF_FALSE
-            #undef is_left_active_equal_comparible_to_right_active
+            #undef is_left_active__equal_comparible_to_right_active_
             #undef X
         }
     }
     
 
     friend void swap (var & lhs, var & rhs)
+    requires requires {
+        requires false;
+    }
     {
         using std::swap;
-        swap (lhs.active, rhs.active);
-        swap (lhs.value_, rhs.value_);
+        if constexpr (not requires {swap (lhs.value_.template get <0> ().value, rhs.value_.template get <0> ().value);})
+        {
+        throw runtime_error ("not swappable");
+        }
+//        swap (lhs.active_, rhs.active_);
+//        swap (lhs.value_.template get <i> ().value, rhs.value_.template get <i> ().value); \
+
+#define X0(_, rhs, lhs) \
+case rhs: \
+if constexpr (not requires {swap (lhs.value_.template get <lhs> ().value, rhs.value_.template get <rhs> ().value);}) \
+{ \
+throw runtime_error ("not swappable"); \
+} \
+else \
+{ \
+swap (lhs.value_.template get <lhs> ().value, rhs.value_.template get <rhs> ().value); \
+swap (lhs.active_, rhs.active_); \
+} \
+break;
+        switch (lhs.active_)
+        {
+        #define X(_, i, __) \
+            case i: \
+                switch (rhs.active_) \
+                { \
+                    BOOST_PP_REPEAT (MAX, X0, i) \
+                } \
+                break;
+    //        swap (lhs.value_, rhs.value_);
+//            BOOST_PP_REPEAT (MAX, X, _)
+        }
     }
     
     template <typename... B>
+    requires requires {
+        requires false;
+    }
     friend void swap (var & lhs, var <B...> & rhs)
+        requires requires {
+            requires false;
+        }
     {
         using std::swap;
         
@@ -412,8 +502,8 @@ break;
         case rhs: \
             if constexpr (requires {swap (lhs.value.template get <lhs_i> (), rhs.value.template get <rhs_i> ());}) \
             { \
-                lhs.active = lhs; \
-                rhs.active = lhs; \
+                lhs.active_ = lhs; \
+                rhs.active_ = lhs; \
                 swap (lhs.value.template get <lhs_i> (), rhs.value.template get <rhs_i> ()); \
             } else \
             { \
@@ -422,11 +512,11 @@ break;
         break;
         
     
-        switch (lhs.active)
+        switch (lhs.active_)
         {
         #define X0(z, n, arg) \
             case n: \
-                switch (rhs.active) \
+                switch (rhs.active_) \
                 { \
                     BOOST_PP_REPEAT (MAX, X1, n) \
                 } \
@@ -440,17 +530,20 @@ break;
 
     template <typename P, typename... Q>
     auto operator= (var <P, Q...>&& other) -> var&
+        requires requires {
+            requires false;
+        }
     {
         swap (*this, other);
         return *this;
-        #define if_left_active_equal_comparible_to_right_active(lhs, rhs) \
+        #define if_left_active__equal_comparible_to_right_active_(lhs, rhs) \
             value_.template get <lhs> ().value = move (other.value_.template get <rhs> ().value); \
             return *this;
                 
         #define IF_TRUE(lhs, rhs) \
             if constexpr (requires {value_.template get <lhs> ().value = other.value_.template get <rhs> ().value;}) \
             { \
-                if_left_active_equal_comparible_to_right_active (lhs, rhs) \
+                if_left_active__equal_comparible_to_right_active_ (lhs, rhs) \
             }
                 
         #define IF_FALSE(lhs, rhs) \
@@ -460,7 +553,7 @@ break;
             } \
 
                 
-        #define is_left_active_equal_comparible_to_right_active(z, rhs, lhs) \
+        #define is_left_active__equal_comparible_to_right_active_(z, rhs, lhs) \
             case rhs: \
                 IF_TRUE (lhs, rhs) \
                 IF_FALSE (lhs, rhs) \
@@ -470,17 +563,17 @@ break;
 
 
 
-        switch (active)
+        switch (active_)
         {
             #define X(z, lhs, nested) \
                 case lhs: \
-                switch (other.active) \
+                switch (other.active_) \
                 { \
                     BOOST_PP_REPEAT (MAX, nested, lhs) \
                 } \
                 break;
                 
-                BOOST_PP_REPEAT (MAX, X, is_left_active_equal_comparible_to_right_active)
+                BOOST_PP_REPEAT (MAX, X, is_left_active__equal_comparible_to_right_active_)
             #undef X
 //            FOR(10, X)
         }
@@ -492,14 +585,14 @@ break;
 //        return get_current().value = other.get_current.value ();
 //#define X(n) \
 //return value.template get <
-//        SWITCH_CASE (active)
+//        SWITCH_CASE (active_)
     }
 
     
     
     auto print () const -> void
     {
-        switch (active)
+        switch (active_)
         {
             #define X(n) \
                 case n: \
@@ -514,13 +607,13 @@ break;
     friend ostream& operator<< (ostream& os, var const& v)
     {
 //        os << v.value.template print <2> ();
-        if (v.active < 0)
+        if (v.active_ < 0)
         {
             os << "bajs";
             return os;
         }
         
-        switch (v.active)
+        switch (v.active_)
         {
             #define X(_, n, __) \
                 case n: \
@@ -537,12 +630,12 @@ break;
     
     ~var ()
     {
-        if (active < 0)
+        if (active_ < 0)
         {
             return;
         }
         
-        switch (active)
+        switch (active_)
         {
         #define X(_, i, __) \
             case i: \
@@ -567,7 +660,7 @@ break;
 
 
 struct emptyy {};
-
+ 
 template <int I, typename T, typename... U>
 //requires ((is_assignable_v<U, P> || ...))
 union vari <I, T, U...>
@@ -582,7 +675,7 @@ union vari <I, T, U...>
     using get_by_type = conditional_t <is_same_v <P, T>, T, typename tail_type::template get_by_type <P>>;
     
     template <int i>
-    using get_by_index = conditional_t <i == I, value_type, typename tail_type::template get_by_index <i>>;
+    using get_value_type_with_index = conditional_t <i == I, value_type, typename tail_type::template get_value_type_with_index <i>>;
   
 
     
@@ -592,100 +685,73 @@ union vari <I, T, U...>
     }
  
     
-    vari (int i, vari && other)
-    {
-        if constexpr (I == 0)
-        {
-            if (i == -1)
-            {
-                return;
-            }
-        }
-        if (i == I)
-        {
-            new (&value) T {move (other.value)};
-        } else
-        {
-            new (&_tail) tail_type {i, move (other._tail)};
-        }
-    }
+//    vari (int i, vari && other)
+//    {
+//        if constexpr (I == 0)
+//        {
+//            if (i == -1)
+//            {
+//                return;
+//            }
+//        }
+//        if (i == I)
+//        {
+//            new (&value) T {move (other.value)};
+//        } else
+//        {
+//            new (&_tail) tail_type {i, move (other._tail)};
+//        }
+//    }
 
     
-    vari (int i, vari const& other)// : value {other.value}, _tail {other.tail}
-    {
-        if (i == I)
-        {
-            new (&value) T {other.value};
-        } else
-        {
-            new (&_tail) tail_type {i, other._tail};
-        }
-    }
-    
-    
-    vari (T&& t) : value {forward <T> (t)}
-    {
-        
-    }
-    
-//    template <typename P>
-//    vari (P&& p) : _tail {forward <P> (p)}
+//    vari (int i, vari const& other)// : value {other.value}, _tail {other.tail}
+//    requires requires () {
+//        new (&value) T {other.value};
+//        new (&_tail) tail_type {i, other._tail};
+//    }
 //    {
-//
+//        if (i == I)
+//        {
+//            new (&value) T {other.value};
+//        } else
+//        {
+//            new (&_tail) tail_type {i, other._tail};
+//        }
 //    }
     
-    friend void swap (vari& lhs, vari& rhs)
-    {
-        using std::swap;
-        swap (lhs.value, rhs.value);
-        swap (lhs.tail, rhs.tail);
-    }
     
-    
-    
-    template <int i, typename P>
-    requires (i == I and is_same_v <P, value_type>)
-    auto init () -> auto&
-    {
-        return *this;
-    }
-    
-    template <int i, typename P>
-    requires (i != I and (not is_same_v <P, value_type>))
-    auto init () -> auto&
-    {
-        return _tail.template init <i, P> ();
-    }
-    
-    template <int from, int to>
-    auto deinit_tail () -> void
-    {
-        
-        
-        if constexpr (I + 1 <= to)
-        {
-            _tail.template deinit_tail <from, to> ();
-            
-            if constexpr (from <= I)
-            {
-                _tail.~tail_type ();
-            }
+    vari (value_type&& t)
+        requires requires {
+            value_type {move(t)};
         }
+        : value {move (t)}
+    {
+        
     }
     
-    template <int i>
-    requires (i >= 0 and i != I)
-    auto deinit_value () -> void
+    vari (value_type const& t)
+        requires requires {
+            value_type {t};
+        }
+        : value {t}
     {
-        _tail.template deinit_value <i> ();
+        
     }
     
-    template <int i>
-    requires (i == I)
-    auto deinit_value () -> void
-    {
-        value.~T ();
+    template <typename P>
+    vari (P&& p)
+    requires requires (P&& v) {
+        tail_type {forward <P> (v)};
     }
+    : _tail {forward <P> (p)}
+    {
+
+    }
+    
+    
+
+    
+
 
     template <int i>
     auto get () -> auto&
@@ -723,63 +789,7 @@ union vari <I, T, U...>
         return *this;
     }
     
-    auto operator= (T&& t) -> auto&
-    {
-        value = forward <decltype (t)> (t);
-        return value;
-    }
-    
-    void set_equal (T&& t, int i)
-    {
-        if (i == I)
-        {
-            
-            value = forward <T> (t);
-        } else
-        {
 
-            clear_value();
-        
-            new (_tail) decltype (_tail) {i};
-        }
-    }
-    
-    template <typename P>
-    auto set_equal (P&& p, int i) -> void
-    {
-        
-    }
-    
-    constexpr auto clear_value () -> void
-    {
-        if constexpr (not is_trivially_destructible_v <T>)
-        {
-            value.~T ();
-        }
-    }
-    
-    template <typename P>
-    requires ((is_assignable_v<U, P> || ...))
-    auto operator= (P&& p) -> auto&
-    {
-//        if constexpr (not is_trivially_destructible_v <P>)
-//            _t.~T();
-        
-//        if constexpr (not is_trivially_destructible_v<T>)
-//        {
-//            if (active)
-//                value.~T ();
-//        }
-        return _tail = forward <P> (p);
-    }
-    
-    
-    
-    
-//    vari& operator= (auto&& t)
-//    {
-//
-//    }
     
     ~vari ()
     {
@@ -806,25 +816,14 @@ union vari <I, T>
     using value_type = T;
     
     template <typename P>
-//    requires (is_same_v <T, P>)
     using get_by_type = T;
     
     template <int i>
-    using get_by_index = value_type;
+    using get_value_type_with_index = value_type;
     
     emptyy _;
     T value;
-    
-    
-    vari (int i, vari && other) : value {move (other.value)}
-    {
-        
-    }
 
-    vari (int i, vari const& other) : value {other.value}
-    {
-
-    }
     
     vari () : _ {}
     {
@@ -836,25 +835,6 @@ union vari <I, T>
         
     }
     
-    template <int i, typename P>
-    requires (i == I and is_same_v <P, value_type>)
-    auto init () -> void
-    {
-        
-    }
-    
-    template <int from, int to>
-    auto deinit_tail () -> void
-    {
-//        value.~T ();
-    }
-    
-    template <int i>
-    auto deinit_value () -> void
-    {
-        value.~T ();
-    }
-    
     template <int i>
     auto get () -> auto&
     {
@@ -878,13 +858,8 @@ union vari <I, T>
     {
         return *this;
     }
-    
-    vari& operator= (auto&& t)
-    {
-        value = forward <decltype (t)> (t);
-        return *this;
-    }
-    
+
+
     
     
     ~vari ()
