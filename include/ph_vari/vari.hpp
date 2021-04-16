@@ -61,12 +61,12 @@ struct var
     
     var (var&& other) : value_ {other.active, move (other.value_)}
     {
-        
+        cout << "tjo" << endl;
     }
     
     var (var const& other) : value_ {other.active, other.value_}
     {
-        
+        cout << "mohaha" << endl;
     }
     
     auto operator= (var const& other) -> var&
@@ -150,9 +150,9 @@ break;
     }
     
     template <typename P>
-    var (P&& arg) : value_ {forward <P> (arg)}, active {type_list_t <T, U...>::template find <P>}
+    var (P&& arg) : value_ {}, active {type_list_t <T, U...>::template find <P>}
     {
-        
+        new (&value_.template get <type_list_t <T, U...>::template find <P>> ().value) decltype (value_.template get <type_list_t <T, U...>::template find <P>> ().value) {forward <P> (arg)};
     }
     
     template <typename... B>
@@ -497,25 +497,43 @@ break;
 
     
     
-    
-    
-    friend ostream& operator<< (ostream& os, var const& v)
+    auto print () const -> void
     {
-//        os << v.value.template print <2> ();
-        
-        switch (v.active)
+        switch (active)
         {
             #define X(n) \
                 case n: \
-                os << v.value_.template print <n> (); \
+                cout << value_.template print <n> (); \
                 break;
 
                             FOR (MAX, X)
             #undef X
         }
+    }
+    
+    friend ostream& operator<< (ostream& os, var const& v)
+    {
+//        os << v.value.template print <2> ();
+        if (v.active < 0)
+        {
+            os << "bajs";
+            return os;
+        }
+        
+        switch (v.active)
+        {
+            #define X(_, n, __) \
+                case n: \
+                os << v.value_.template get <n> ().value; \
+                break;
+                            BOOST_PP_REPEAT (MAX, X, _)
+            #undef X
+        }
 
         return os;
     }
+    
+    
     
     ~var ()
     {
@@ -568,7 +586,10 @@ union vari <I, T, U...>
   
 
     
-    vari () = default;
+    vari () : _ {}
+    {
+        
+    }
  
     
     vari (int i, vari && other)
@@ -585,7 +606,7 @@ union vari <I, T, U...>
             new (&value) T {move (other.value)};
         } else
         {
-            new (&_tail) tail_type {move (other._tail)};
+            new (&_tail) tail_type {i, move (other._tail)};
         }
     }
 
@@ -607,11 +628,11 @@ union vari <I, T, U...>
         
     }
     
-    template <typename P>
-    vari (P&& p) : _tail {forward <P> (p)}
-    {
-        
-    }
+//    template <typename P>
+//    vari (P&& p) : _tail {forward <P> (p)}
+//    {
+//
+//    }
     
     friend void swap (vari& lhs, vari& rhs)
     {
@@ -805,7 +826,7 @@ union vari <I, T>
 
     }
     
-    vari ()
+    vari () : _ {}
     {
         
     }
