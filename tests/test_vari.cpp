@@ -40,6 +40,7 @@ struct D
 };
 
 
+
 //TEST_CASE ("0")
 //{
 //
@@ -72,6 +73,15 @@ TEST_CASE ("call actives (if active) destructor")
     }
     
     REQUIRE (A::alive == 0);
+    
+    {
+        var <D, int, C, A> v0 {A {}};
+        REQUIRE (A::alive == 1);
+        v0 = A {};
+        REQUIRE (A::alive == 1);
+        v0 = D {};
+        REQUIRE (A::alive == 0);
+    }
 }
 
 TEST_CASE ("")

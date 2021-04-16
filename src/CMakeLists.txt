@@ -1,6 +1,6 @@
 
 
-file(GLOB_RECURSE HEADER_LIST "${PROJECT_SOURCE_DIR}/include/*.hpp")
+file(GLOB_RECURSE HEADER_LIST "${PROJECT_SOURCE_DIR}/include/*.hpp" *.hpp)
 file(GLOB SOURCE_LIST ${PROJECT_SOURCE_DIR}/src/*.cpp)
 
 set (self ${PROJECT_NAME})
@@ -20,7 +20,7 @@ target_link_libraries (${self} PRIVATE ph::type ph::time ph::macros ph::type_lis
 target_include_directories (${self} PUBLIC ${PROJECT_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS})
 # target_include_directories (${self} PUBLIC ph::coroutines)
 target_compile_features (${self} PUBLIC cxx_std_20)
-
+target_include_directories (${self} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 target_include_directories(${self} PRIVATE
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/${self}>

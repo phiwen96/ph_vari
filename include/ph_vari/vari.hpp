@@ -87,7 +87,7 @@ struct var
         switch (other.active)
         {
         #define ALIAS(i) typename var <B...>::vari_type::template get_by_index <i>
-        #define X0(z, i, arg) \
+        #define X(z, i, arg) \
             case i: \
                 if constexpr (is_same_v <ALIAS (i), decltype (value_.template get <ALIAS (i)> ().value)> and requires (ALIAS (i)& a0, ALIAS (i)& a1){swap (a0, a1);}) \
                 { \
@@ -95,7 +95,9 @@ struct var
                     swap (value_.template get <ALIAS (i)> ().value, other.value_.template get <i> ().value); \
                 } \
                 break;
-        BOOST_PP_REPEAT (MAX, X0, _)
+        BOOST_PP_REPEAT (MAX, X, _)
+        #undef ALIAS
+        #undef X0
         }
     }
     
