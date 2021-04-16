@@ -110,6 +110,9 @@ TEST_CASE ("Constructs and assignments")
             THEN ("Var should also be copy constructible")
             {
                 REQUIRE (is_copy_constructible_v <var <A, C, D>>);
+                
+                var <A, C, D> v0;
+                var <A, C, D> v1 {v0};
             }
         }
         
@@ -134,6 +137,10 @@ TEST_CASE ("Constructs and assignments")
             THEN ("Var should also be move constructible")
             {
                 REQUIRE (is_move_constructible_v <var <A, B, D>>);
+                
+                REQUIRE (not is_copy_constructible_v <var <A, B, D>>);
+                var <A, B, D> v0;
+                var <A, B, D> v1 {move (v0)};
             }
         }
         
@@ -158,6 +165,12 @@ TEST_CASE ("Constructs and assignments")
             THEN ("Var should also be move constructible")
             {
                 REQUIRE (is_move_assignable_v <var <B, C, D>>);
+                
+                
+                REQUIRE (not is_copy_assignable_v <var <B, C, D>>);
+                var <B, C, D> v0;
+                var <B, C, D> v1;
+                v0 = move (v1);
             }
         }
         
