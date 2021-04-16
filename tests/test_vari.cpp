@@ -217,6 +217,7 @@ TEST_CASE ("Constructs and assignments")
     }
 }
 
+
 TEST_CASE ("")
 {
     var <A, int, C, D> v0;
