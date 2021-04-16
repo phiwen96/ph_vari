@@ -128,24 +128,70 @@ TEST_CASE("is not class")
    /**/
 
 //    cout << sizeof (variant <int, double, char, string>) << endl;
-//    cout << sizeof (var <int, double, char, string>) << endl;
-//    int max = 10000000;
+    cout << sizeof (var <int, double, char, string>) << endl;
+    int max = 10000000;
 //    int max = 0;
-//
-//    {
-//        Timer <true> t ("variant");
-//        for (int i = 0; i < max; ++i)
-//        {
-//            variant <int, double, char, string> k {string {}};
-//        }
-//    }
-//    {
-//        Timer <true> t ("vari");
-//        for (int i = 0; i < max; ++i)
-//        {
-//            var <int, double, char, string> k {string {}};
-//        }
-//    }
+
+    {
+        Timer <true> t ("variant");
+        for (int i = 0; i < max; ++i)
+        {
+            variant <int, double, char, string> k {string {}};
+        }
+    }
+    {
+        Timer <true> t ("vari");
+        for (int i = 0; i < max; ++i)
+        {
+            var <int, double, char, string> k {string {}};
+        }
+    }
+    
+    {
+        variant <int, double, char, string> k {string {}};
+        
+        Timer <true> t ("variant move assign");
+        
+        for (int i = 0; i < max; ++i)
+        {
+            k = double {3};
+        }
+    }
+    {
+        var <int, double, char, string> k {string {}};
+
+        Timer <true> t ("vari move assign");
+        for (int i = 0; i < max; ++i)
+        {
+            k = double {3};
+        }
+    }
+    
+    {
+        variant <int, double, char, string> k {string {}};
+        
+        Timer <true> t ("variant if type");
+        
+        for (int i = 0; i < max; ++i)
+        {
+            if (k.index() == 3)
+            {
+                
+            }
+        }
+    }
+    {
+        var <int, double, char, string> k {string {}};
+
+        Timer <true> t ("vari if type");
+        for (int i = 0; i < max; ++i)
+        {
+            if (type <string> == k)
+            {
+                
+            }
+        }
+    }
 //
 //
 ////    var <A, int, C, D> k {C {}};
