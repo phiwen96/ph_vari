@@ -41,9 +41,9 @@ struct B
 {
     B (B const&) = delete;
     B& operator= (B &&) {return *this;}
-    B (B&&){cout << "B (B&&)" << endl;}
-    B (){cout << "B ()" << endl;}
-    ~B (){cout << "~B ()" << endl;}
+    B (B&&){/*cout << "B (B&&)" << endl;*/}
+    B (){/*cout << "B ()" << endl;*/}
+    ~B (){/*cout << "~B ()" << endl;*/}
     friend ostream& operator<< (ostream& os, B const& d)
     {
         return os << "B";
@@ -60,11 +60,11 @@ struct C
 {
     C& operator= (C &&) {return *this;}
     C& operator= (C const&) {return *this;}
-    C (C const&){cout << "C (C const&)" << endl;}
+    C (C const&){/*cout << "C (C const&)" << endl;*/}
 //    C (C&&){cout << "C (C&&)" << endl;}
     C (C&&) = delete;
-    C (){cout << "C ()" << endl;}
-    ~C (){cout << "~C ()" << endl;}
+    C (){/*cout << "C ()" << endl;*/}
+    ~C (){/*cout << "~C ()" << endl;*/}
     friend ostream& operator<< (ostream& os, C const& d)
     {
         return os << "C";
@@ -82,15 +82,39 @@ struct D
 {
     D& operator= (D &&) {return *this;}
     D& operator= (D const&) {return *this;}
-    D (D const&){cout << "D (D const&)" << endl;}
-    D (D&&){cout << "D (D&&)" << endl;}
-    D (){cout << "D ()" << endl;}
-    ~D (){cout << "~D ()" << endl;}
+    D (D const&){/*cout << "D (D const&)" << endl;*/}
+    D (D&&){/*cout << "D (D&&)" << endl;*/}
+    D (){/*cout << "D ()" << endl;*/}
+    ~D (){/*cout << "~D ()" << endl;*/}
     friend ostream& operator<< (ostream& os, D const& d)
     {
         return os << "D";
     }
 };
+
+static_assert (is_copy_constructible_v <A>);
+static_assert (not is_copy_constructible_v <B>);
+static_assert (is_copy_constructible_v <C>);
+static_assert (is_copy_constructible_v <D>);
+
+static_assert (is_move_constructible_v <A>);
+static_assert (is_move_constructible_v <B>);
+static_assert (not is_move_constructible_v <C>);
+static_assert (is_move_constructible_v <D>);
+
+static_assert (not is_move_assignable_v <A>);
+static_assert (is_move_assignable_v <B>);
+static_assert (is_move_assignable_v <C>);
+static_assert (is_move_assignable_v <D>);
+
+static_assert (is_copy_assignable_v <A>);
+static_assert (not is_copy_assignable_v <B>);
+static_assert (is_copy_assignable_v <C>);
+static_assert (is_copy_assignable_v <D>);
+
+
+
+
 
 TEST_CASE ("Constructs and assignments")
 {
@@ -196,6 +220,11 @@ TEST_CASE ("Constructs and assignments")
             THEN ("Var should also be copy constructible")
             {
                 REQUIRE (is_copy_assignable_v <var <A, C, D>>);
+                
+
+                var <A, C, D> v0;
+                var <A, C, D> v1;
+                v0 = v1;
             }
         }
         
@@ -210,26 +239,126 @@ TEST_CASE ("Constructs and assignments")
                 REQUIRE (not is_copy_assignable_v <var <A, B, C>>);
             }
         }
-        
-        
-        
-        
-        
-        
-        
-        THEN ("These should run")
+    }
+}
+
+
+TEST_CASE ("value_type constructs")
+{
+    WHEN ("basics")
+    {
         {
-            REQUIRE (not is_copy_constructible_v <var <A, B, C>>);
-            
-            
-            REQUIRE (is_move_constructible_v <A>);
-            REQUIRE (is_move_constructible_v <B>);
-            REQUIRE (not is_move_constructible_v <C>);
-            REQUIRE (is_move_constructible_v <D>);
+            auto v0 = var <int, double, string> {};
+            REQUIRE (v0.active () == -1);
+        }
+        {
+            auto v0 = var <int, double, string> {int {2}};
+            REQUIRE (v0.active () == 0);
+            int& i = v0;
+            REQUIRE (i == 2);
+            i = 3;
+            REQUIRE ((int&) v0 == 3);
+            (int&) v0 = 2;
+            REQUIRE (i == 2);
+        }
+        {
+            auto v0 = var <int, double, string> {double {2}};
+            REQUIRE (v0.active () == 1);
+            double& i = v0;
+            REQUIRE (i == 2);
+            i = 3;
+            REQUIRE ((double&) v0 == 3);
+            (double&) v0 = 2;
+            REQUIRE (i == 2);
+        }
+        {
+            auto v0 = var <int, double, string> {string {"hej"}};
+            REQUIRE (v0.active () == 2);
+            string& i = v0;
+            REQUIRE (i == "hej");
+            i = "då";
+            REQUIRE ((string&) v0 == "då");
+            (string&) v0 = "hej";
+            REQUIRE (i == "hej");
+        }
+    }
+    
+    WHEN ("default constructor")
+    {
+        auto v0 = var <int, double, string> {};
+        
+        THEN ("v0.active () == -1")
+        {
+            REQUIRE (v0.active () == -1);
+        }
+    }
+    
+    WHEN ("copy constructor")
+    {
+        
+        REQUIRE (not is_move_constructible_v <C>);
+        
+        {
+            auto v0 = var <C, double, string> {C {}};
+            REQUIRE (v0.active () == 0);
+        }
+        {
+            auto v0 = var <double, C, string> {C {}};
+            REQUIRE (v0.active () == 1);
+        }
+        {
+            auto v0 = var <double, string, C> {C {}};
+            REQUIRE (v0.active () == 2);
+        }
+    }
+    
+    WHEN ("move constructor")
+    {
+        
+        REQUIRE (not is_copy_constructible_v <B>);
+        
+        {
+            auto v0 = var <B, double, string> {B {}};
+            REQUIRE (v0.active () == 0);
+        }
+        {
+            auto v0 = var <double, B, string> {B {}};
+            REQUIRE (v0.active () == 1);
+        }
+        {
+            auto v0 = var <double, string, B> {B {}};
+            REQUIRE (v0.active () == 2);
+        }
+    }
+    
+    WHEN ("copy assign")
+    {
+        
+        REQUIRE (not is_copy_constructible_v <B>);
+
+        {
+            auto v0 = var <B, double, string> {B {}};
+            REQUIRE (v0.active () == 0);
+        }
+        {
+            auto v0 = var <double, B, string> {B {}};
+            REQUIRE (v0.active () == 1);
+        }
+        {
+            auto v0 = var <double, string, B> {B {}};
+            REQUIRE (v0.active () == 2);
         }
     }
 }
 
+TEST_CASE (".get <T> ()")
+{
+    GIVEN ("var")
+    {
+//        var <int, double, char, string> v0;
+        
+    }
+}
 
 TEST_CASE ("")
 {

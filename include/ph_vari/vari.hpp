@@ -140,7 +140,7 @@ break;
     }
     
     auto operator= (var&& other) -> var&
-        requires requires () {
+        requires requires {
             requires (is_move_assignable_v<T> and (is_move_assignable_v<U> and ...));
         }
     {
@@ -201,6 +201,75 @@ break;
         return *this;
     }
     
+    template <typename P>
+    var (P&& arg)
+        requires requires {
+            requires type_list_t <T, U...>::template find <P> >= 0;
+            P {move (arg)};
+        }
+        : value_ {move (arg)}, active_ {type_list_t <T, U...>::template find <P>}
+    {
+        
+    }
+    
+    template <typename P>
+    var (P const& arg)
+        requires requires {
+            requires type_list_t <T, U...>::template find <P> >= 0;
+            P {arg};
+        }
+        : value_ {arg}, active_ {type_list_t <T, U...>::template find <P>}
+    {
+        
+    }
+    
+    /**
+     set current value equal to
+     */
+    template <typename P>
+//    requires (vari_value_type_exists <P>)
+    requires requires {
+        requires false;
+    }
+    auto operator= (P&& p) -> auto&
+    {
+        /**
+         If active_, delete current vari and all before (?)
+         */
+//        value.template deinit_value <0> ();
+        if (active_ == get_vari_index_from_type <P>)
+        {
+            if constexpr (requires (P& pp){pp = forward <P> (p);})
+            {
+                return value_.template get <get_vari_index_from_type <P>> ().value = forward <P> (p);
+            } else
+            {
+                throw runtime_error ("not assignable");
+            }
+        } else if (active_ >= 0)
+        {
+            switch (active_)
+            {
+            #define X(n) \
+                case n: \
+                    value_.template deinit_value <n> (); \
+                break;
+                    
+                    FOR (MAX, X)
+            #undef X
+            }
+            auto& a = value_.template get <get_vari_index_from_type <P>> ();
+            new (&a.value) P {forward <P> (p)};
+            active_ = get_vari_index_from_type <P>;
+            return a.value;
+        } else
+        {
+            auto& a = value_.template get <get_vari_index_from_type <P>> ();
+            new (&a.value) P {forward <P> (p)};
+            active_ = get_vari_index_from_type <P>;
+            return a.value;
+        }
+    }
     
     
     template <typename... B>
@@ -224,18 +293,7 @@ break;
     
     
     
-    template <typename P>
-    var (P&& arg)
-    requires requires {
-        requires false;
-    requires type_list_t <T, U...>::template find <P> >= 0;
-    forward <P> (arg);
-    P {forward <P> (arg)};
-    }
-    : value_ {forward <P> (arg)}, active_ {type_list_t <T, U...>::template find <P>}
-    {
-//        new (&value_.template get <type_list_t <T, U...>::template find <P>> ().value) decltype (value_.template get <type_list_t <T, U...>::template find <P>> ().value) {forward <P> (arg)};
-    }
+    
     
     
     
@@ -264,7 +322,19 @@ new (&value_.template get <ALIAS (i)> ().value) ALIAS (i) {move (other.value_.te
     }
     
     template <typename A>
+    requires requires () {
+        requires is_same_v <A, T> or (is_same_v <A, U> or ...);
+    }
     auto get () -> auto&
+    {
+        return value_.template get <A> ().value;
+    }
+    
+    template <typename A>
+    requires requires () {
+        requires is_same_v <A, T> or (is_same_v <A, U> or ...);
+    }
+    auto get () -> auto const&
     {
         return value_.template get <A> ().value;
     }
@@ -296,30 +366,31 @@ new (&value_.template get <ALIAS (i)> ().value) ALIAS (i) {move (other.value_.te
     }
     
     template <typename A>
-    requires requires {
-        requires false;
-    }
     operator A & ()
+    requires requires {
+        requires type_list_t <T, U...>::template find <A> >= 0;
+    }
     {
-        if (active_ < 0)
-        {
-            throw runtime_error ("not active_!");
-        }
-        
-        switch (active_)
-        {
-        #define X(_, i, __) \
-            case i: \
-                if constexpr (is_convertible_v <CURRENT_TYPE (i), A>) \
-                    return CURRENT_VALUE (i); \
-                else \
-                    throw runtime_error ("not convertible"); \
-                break;
-                
-            BOOST_PP_REPEAT (MAX, X, _)
-        #undef X
-            
-        }
+        return value_.template get <A> ().value;
+//        if (active_ < 0)
+//        {
+//            throw runtime_error ("not active_!");
+//        }
+//
+//        switch (active_)
+//        {
+//        #define X(_, i, __) \
+//            case i: \
+//                if constexpr (is_convertible_v <CURRENT_TYPE (i), A>) \
+//                    return CURRENT_VALUE (i); \
+//                else \
+//                    throw runtime_error ("not convertible"); \
+//                break;
+//
+//            BOOST_PP_REPEAT (MAX, X, _)
+//        #undef X
+//
+//        }
     }
     
     template <typename A>
@@ -394,53 +465,7 @@ new (&value_.template get <ALIAS (i)> ().value) ALIAS (i) {move (other.value_.te
     
     
     
-    /**
-     set current value equal to
-     */
-    template <typename P>
-//    requires (vari_value_type_exists <P>)
-    requires requires {
-        requires false;
-    }
-    auto operator= (P&& p) -> auto&
-    {
-        /**
-         If active_, delete current vari and all before (?)
-         */
-//        value.template deinit_value <0> ();
-        if (active_ == get_vari_index_from_type <P>)
-        {
-            if constexpr (requires (P& pp){pp = forward <P> (p);})
-            {
-                return value_.template get <get_vari_index_from_type <P>> ().value = forward <P> (p);
-            } else
-            {
-                throw runtime_error ("not assignable");
-            }
-        } else if (active_ >= 0)
-        {
-            switch (active_)
-            {
-            #define X(n) \
-                case n: \
-                    value_.template deinit_value <n> (); \
-                break;
-                    
-                    FOR (MAX, X)
-            #undef X
-            }
-            auto& a = value_.template get <get_vari_index_from_type <P>> ();
-            new (&a.value) P {forward <P> (p)};
-            active_ = get_vari_index_from_type <P>;
-            return a.value;
-        } else
-        {
-            auto& a = value_.template get <get_vari_index_from_type <P>> ();
-            new (&a.value) P {forward <P> (p)};
-            active_ = get_vari_index_from_type <P>;
-            return a.value;
-        }
-    }
+    
     
     
     
@@ -803,6 +828,7 @@ union vari <I, T, U...>
     }
     
     
+    
 
     
 
@@ -885,6 +911,11 @@ union vari <I, T>
     }
     
     vari (T&& t) : value {forward <T> (t)}
+    {
+        
+    }
+    
+    vari (T const& t) : value {t}
     {
         
     }
