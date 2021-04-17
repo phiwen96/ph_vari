@@ -2,8 +2,30 @@
 #include <ph_vari/vari.hpp>
 #include <ph_time/timer.hpp>
 #include <ph_type_list/type_list.hpp>
-#include <ph_concepts/concepts.hpp>
+#include <ph_type/type.hpp>
 using namespace std;
+
+
+
+
+template <typename... T>
+struct overload : T...
+{
+    using T::operator()...;
+};
+
+template <typename... T>
+overload (T...) -> overload <T...>;
+
+TEST_CASE ("")
+{
+    overload o {[](int){cout << "int" << endl;}, [](double){cout << "double" << endl;}};
+    auto tw = type_watcher (o);
+    o (double {3});
+    
+}
+
+
 
 /**
  1 move constructible
@@ -530,81 +552,12 @@ struct value_advancer <range_values_t <begin_value_t <a, b>, end_value_t <a, b>>
     inline static constexpr value_type value = advance_value_t <n>::value;
 };
 
-template <typename... T>
-auto type_watcher (T&&... t)
-{
-    return [...t = forward <T> (t)] <typename... U> ()
-    {
-        constexpr auto me = [] <typename A, typename... B> (auto&& me, auto&& fun) constexpr
-        {
-            if constexpr (requires {fun.template operator () <A> ();})
-            {
-                if (not fun.template operator () <A> ())
-                {
-                    if constexpr (sizeof... (B) > 0)
-                    {
-                        me.template operator () <B...> (move (me), forward <decltype (fun)> (fun));
-                    }
-                }
-            } else if constexpr (sizeof... (B) > 0)
-            {
-                me.template operator () <B...> (move (me), forward <decltype (fun)> (fun));
-            }
-        };
-        
-        (..., me.template operator () <U...> (move (me), t));
-    };
-}
 
-template <typename T>
-concept is_string = requires {
-    requires (is_same_v <T, string>);
-};
-
-TEST_CASE ("")
-{
-    auto fun =
-    type_watcher ([]<is_string T>(){cout << "0" << endl; return false;}, []<typename T>(){cout << "1" << endl; return false;},
-                  []<typename T>(){cout << "2" << endl; return false;}, []<typename T>(){cout << "3" << endl; return false;});
-    
-    fun.template operator () <int, double, string> ();
-}
-
-template <typename... T>
+template <typename...>
 struct types
 {
-    template <typename... F>
-    constexpr types (F&&... f)
-    {
-        [...f = forward <F> (f)] () -> auto
-        {
-            auto me = [] <typename C, typename... D, typename F1, typename F2> (F1&& me, F2&& fun)
-            {
-                if constexpr (requires {fun.template operator () <C> ();})
-                {
-                    if constexpr (not fun.template operator () <C> ())
-                    {
-                        if constexpr (sizeof... (D) > 0)
-                        {
-                            me.template operator () <D...> (forward <F1> (me), forward <F2> (fun));
-                        }
-                    }
-                }
-            };
-            
-            (..., [] <typename F1, typename F2> (F1&& me, F2&& fun)
-            {
-                if constexpr (requires {me.template operator () <T...> (move (me), forward <F2> (fun));})
-                {
-                    me.template operator () <T...> (move (me), forward <F2> (fun));
-                }
-            
-            } (move (me), f));
-        } ();
-    }
+    
 };
-
-
 
 
 template <typename...>
@@ -1074,10 +1027,7 @@ constexpr auto empty_type = empty_type_t <T...>::value;
 
 
 
-template <typename F>
-concept works = requires (F&& fun){
-    {fun.template operator () <C> ()};
-};
+
 
 template <typename A, typename... B>
 struct type_transformer_t <range_types_t <begin_type_t <A, B...>, end_type_t <A, B...>>>
@@ -1092,46 +1042,26 @@ struct type_transformer_t <range_types_t <begin_type_t <A, B...>, end_type_t <A,
 //    template <typename T>
     using retreat = typename type_retreater <range_types_>::type;
     
+    template <typename F>
+    inline static constexpr bool works = requires (F&& fun){
+        {fun.template operator () <C> ()};
+    };
     
-    template <typename... Funcs>
-    constexpr type_transformer_t (Funcs&&... fun)
+    constexpr type_transformer_t (auto&&... fun)
     {
-        [...funs = forward <Funcs> (fun)] ()
-        {
-            auto me = [] <typename C, typename... D, typename F1, typename F2> (F1&& me, F2&& fun)
-            {
-                if constexpr (requires {
-                    {fun.template operator () <C> ()};
-                })
-                {
-                    if (not fun.template operator () <C> ())
-                    {
-                        if constexpr (sizeof... (D) > 0)
-                        {
-                            me.template operator () <D...> (forward <F1> (me), forward <F2> (fun));
-                        }
-                    }
-                }
-            };
-            
-            (..., [] <typename F1, typename F2> (F1&& me, F2&& fun)
-            {
-                if constexpr (requires {
-                    {me.template operator () <A, B...> (forward <F1> (me), forward <F2> (fun))};
-                })
-                {
-                    me.template operator () <A, B...> (forward <F1> (me), forward <F2> (fun));
-                }
-            
-            } (move (me), funs));
-        } ();
+        
     }
+    
 };
 
 template <typename... T>
 using make_type_transformer = type_transformer_t <range_types_t <begin_type_t <T...>, end_type_t <T...>>>;
 
 
+template <typename A>
+concept is_string = requires {
+    requires (is_same_v <A, string>);
+};
 
 TEST_CASE ("")
 {
@@ -1139,16 +1069,16 @@ TEST_CASE ("")
     transformer t =
     {
         
-        [] <is_string T> () constexpr {
-            cout << "hi" << endl;
-            if constexpr (is_same_v <T, int>) {
-                cout << "int" << endl;
-            } else if constexpr (is_same_v <T, double>)
-            {
-                cout << "double" << endl;
-            }
-            return true;
-        },
+//        [] <is_string T> () constexpr {
+//            cout << "hi" << endl;
+//            if constexpr (is_same_v <T, int>) {
+//                cout << "int" << endl;
+//            } else if constexpr (is_same_v <T, double>)
+//            {
+//                cout << "double" << endl;
+//            }
+//            return true;
+//        },
         
         [] <typename T> () constexpr {
             cout << "hi" << endl;
