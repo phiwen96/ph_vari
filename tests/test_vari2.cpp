@@ -22,7 +22,6 @@ TEST_CASE ("")
     overload o {[](int){cout << "int" << endl;}, [](double){cout << "double" << endl;}};
     auto tw = type_watcher (o);
     o (double {3});
-    
 }
 
 
