@@ -529,12 +529,82 @@ struct value_advancer <range_values_t <begin_value_t <a, b>, end_value_t <a, b>>
     inline static constexpr value_type value = advance_value_t <n>::value;
 };
 
+template <typename... T>
+requires
+auto type_watcher (T&&... t)
+{
+    return [...t = forward <T> (t)] <typename... U> ()
+    {
+        constexpr auto me = [] <typename A, typename... B> (auto&& me, auto&& fun) constexpr
+        {
+            if constexpr (requires {fun.template operator () <A> ();})
+            {
+                if (not fun.template operator () <A> ())
+                {
+                    if constexpr (sizeof... (B) > 0)
+                    {
+                        me.template operator () <B...> (move (me), forward <decltype (fun)> (fun));
+                    }
+                }
+            } else if constexpr (sizeof... (B) > 0)
+            {
+                me.template operator () <B...> (move (me), forward <decltype (fun)> (fun));
+            }
+        };
+        
+        (..., me.template operator () <U...> (move (me), t));
+    };
+}
 
-template <typename...>
+template <typename T>
+concept is_string = requires {
+    requires (is_same_v <T, string>);
+};
+
+TEST_CASE ("")
+{
+    auto fun =
+    type_watcher ([]<is_string T>(){cout << "0" << endl; return false;}, []<typename T>(){cout << "1" << endl; return false;},
+                  []<typename T>(){cout << "2" << endl; return false;}, []<typename T>(){cout << "3" << endl; return false;});
+    
+    fun.template operator () <int, double, string> ();
+}
+
+template <typename... T>
 struct types
 {
-    
+    template <typename... F>
+    constexpr types (F&&... f)
+    {
+        [...f = forward <F> (f)] () -> auto
+        {
+            auto me = [] <typename C, typename... D, typename F1, typename F2> (F1&& me, F2&& fun)
+            {
+                if constexpr (requires {fun.template operator () <C> ();})
+                {
+                    if constexpr (not fun.template operator () <C> ())
+                    {
+                        if constexpr (sizeof... (D) > 0)
+                        {
+                            me.template operator () <D...> (forward <F1> (me), forward <F2> (fun));
+                        }
+                    }
+                }
+            };
+            
+            (..., [] <typename F1, typename F2> (F1&& me, F2&& fun)
+            {
+                if constexpr (requires {me.template operator () <T...> (move (me), forward <F2> (fun));})
+                {
+                    me.template operator () <T...> (move (me), forward <F2> (fun));
+                }
+            
+            } (move (me), f));
+        } ();
+    }
 };
+
+
 
 
 template <typename...>
@@ -1004,7 +1074,10 @@ constexpr auto empty_type = empty_type_t <T...>::value;
 
 
 
-
+template <typename F>
+concept works = requires (F&& fun){
+    {fun.template operator () <C> ()};
+};
 
 template <typename A, typename... B>
 struct type_transformer_t <range_types_t <begin_type_t <A, B...>, end_type_t <A, B...>>>
@@ -1019,79 +1092,46 @@ struct type_transformer_t <range_types_t <begin_type_t <A, B...>, end_type_t <A,
 //    template <typename T>
     using retreat = typename type_retreater <range_types_>::type;
     
-    template <typename F>
-    inline static constexpr bool works = requires (F&& fun){
-        {fun.template operator () <C> ()};
-    };
     
-    constexpr type_transformer_t (auto&&... fun)
+    template <typename... Funcs>
+    constexpr type_transformer_t (Funcs&&... fun)
     {
-        auto aa = [] <typename C, typename... D> (auto&& me, auto&& fun)
-        requires requires {
-            {fun.template operator () <C> ()};
-        }
+        [...funs = forward <Funcs> (fun)] ()
         {
-            
-            if (not fun.template operator () <C> ())
+            auto me = [] <typename C, typename... D, typename F1, typename F2> (F1&& me, F2&& fun)
             {
-                if constexpr (sizeof... (D) > 0)
-                {
-                    me.template operator () <D...> (forward <decltype (me)> (me), forward <decltype (fun)> (fun));
-                }
-            }
-
-        };
-        
-        [...funs = forward <decltype (fun)> (fun)] ()
-        {
-            (..., ([] (auto&& f) {
-                
                 if constexpr (requires {
-                    {f.template operator () <C> ()};
+                    {fun.template operator () <C> ()};
                 })
                 {
-                    auto ff = [] <typename C, typename... D> (auto&& me, auto&& fun)
-                    requires requires {
-                        {fun.template operator () <C> ()};
-                    }
+                    if (not fun.template operator () <C> ())
                     {
-                        
-                        if (not fun.template operator () <C> ())
+                        if constexpr (sizeof... (D) > 0)
                         {
-                            if constexpr (sizeof... (D) > 0)
-                            {
-                                me.template operator () <D...> (forward <decltype (me)> (me), forward <decltype (fun)> (fun));
-                            }
+                            me.template operator () <D...> (forward <F1> (me), forward <F2> (fun));
                         }
-
-                    };
-                    
-                    ff (ff, forward <decltype (f)> (f));
+                    }
                 }
-            }(funs)));
-        };
-        
-//        ((aa.template operator () <A, B...> (move (aa), forward <decltype (fun)> (fun))), ...);
-        
-//        for (auto i = begin_type_t <A, B...>::value; i < end_type_t <A, B...>::value; ++i)
-//        {
-//            if (fun.template operator () <front <A, B...>> (*this))
-//            {
-//                break;
-//            }
-//        }
+            };
+            
+            (..., [] <typename F1, typename F2> (F1&& me, F2&& fun)
+            {
+                if constexpr (requires {
+                    {me.template operator () <A, B...> (forward <F1> (me), forward <F2> (fun))};
+                })
+                {
+                    me.template operator () <A, B...> (forward <F1> (me), forward <F2> (fun));
+                }
+            
+            } (move (me), funs));
+        } ();
     }
-    
 };
 
 template <typename... T>
 using make_type_transformer = type_transformer_t <range_types_t <begin_type_t <T...>, end_type_t <T...>>>;
 
 
-template <typename A>
-concept is_string = requires {
-    requires (is_same_v <A, string>);
-};
 
 TEST_CASE ("")
 {
@@ -1099,16 +1139,16 @@ TEST_CASE ("")
     transformer t =
     {
         
-//        [] <is_string T> () constexpr {
-//            cout << "hi" << endl;
-//            if constexpr (is_same_v <T, int>) {
-//                cout << "int" << endl;
-//            } else if constexpr (is_same_v <T, double>)
-//            {
-//                cout << "double" << endl;
-//            }
-//            return true;
-//        },
+        [] <is_string T> () constexpr {
+            cout << "hi" << endl;
+            if constexpr (is_same_v <T, int>) {
+                cout << "int" << endl;
+            } else if constexpr (is_same_v <T, double>)
+            {
+                cout << "double" << endl;
+            }
+            return true;
+        },
         
         [] <typename T> () constexpr {
             cout << "hi" << endl;
