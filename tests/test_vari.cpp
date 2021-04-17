@@ -92,6 +92,15 @@ struct D
     }
 };
 
+
+
+
+
+
+
+
+
+
 static_assert (is_copy_constructible_v <A>);
 static_assert (not is_copy_constructible_v <B>);
 static_assert (is_copy_constructible_v <C>);
@@ -333,7 +342,7 @@ TEST_CASE ("value_type constructs")
     
     WHEN ("copy assign")
     {
-        
+
         REQUIRE (not is_copy_constructible_v <B>);
 
         {

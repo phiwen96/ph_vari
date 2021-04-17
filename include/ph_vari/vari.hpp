@@ -7,15 +7,6 @@
 
 
 
-template <typename T>
-struct transform_t
-{
-    
-};
-
-template <typename T>
-inline static constexpr transform_t <T> transform {};
-
 
 
 
@@ -36,16 +27,14 @@ template <int, typename...>
 union vari {};
 
 template <typename T, typename... U>
-//requires requires () {
-//
-//}
 struct var <T, U...>
 {
     #define CURRENT_VALUE(i) value_.template get <i> ().value
     #define CURRENT_TYPE(i) typename value_type::template get_value_type_with_index <i>
     #define MAX 30
+    static_assert (sizeof... (U) + 1 <= MAX, "LIMIT!!!");
     inline static constexpr int size = sizeof... (U) + 1;
-    int active_ {-1};
+    
     
     
     
@@ -58,6 +47,7 @@ struct var <T, U...>
     using get_type_with_index = typename value_type::template get_value_type_with_index <i>;
 
     value_type value_;
+    int active_ {-1};
     
     
     
@@ -110,29 +100,71 @@ struct var <T, U...>
             requires (is_copy_assignable_v<T> and (is_copy_assignable_v<U> and ...));
         }
     {
-        if (active_ != other.active_)
+        if (active_ >= 0)
         {
-            switch (active_)
+            
+            if (active_ != other.active_)
             {
-    #define X(_, i, __) \
-    case i: \
-    CURRENT_VALUE (i).~decltype (CURRENT_VALUE (i)) (); \
-    break;
-                    BOOST_PP_REPEAT (MAX, X, _)
-#undef X
+                /**
+                    call current value's destructor
+                 */
+                switch (active_)
+                {
+                #define X0(_, rhs, lhs) \
+                    case rhs: \
+                        if constexpr (requires {CURRENT_VALUE (lhs) = other.CURRENT_VALUE (rhs);}) \
+                        { \
+                            CURRENT_VALUE (lhs) = other.CURRENT_VALUE (rhs); \
+                        } \
+                        break;
+                        
+                #define X(_, i, __) \
+                    case i: \
+                        CURRENT_VALUE (i).~decltype (CURRENT_VALUE (i)) (); \
+                        switch (other.active_) \
+                        { \
+                            BOOST_PP_REPEAT (MAX, X0, _) \
+                        } \
+                        break;
+                        
+                BOOST_PP_REPEAT (MAX, X, _)
+                #undef X0
+                #undef X
+                }
+                active_ = other.active_;
+            } else
+            {
+                switch (active_)
+                {
+                #define X(_, i, __) \
+                    case i: \
+                        CURRENT_VALUE (i) = other.CURRENT_VALUE (i); \
+                        break;
+                        
+                BOOST_PP_REPEAT (MAX, X, _)
+                #undef X
+                }
             }
+        } else
+        {
+            switch (other.active_)
+            {
+            #define X(_, i, __) \
+                case i: \
+                    if constexpr (requires {CURRENT_TYPE (i) {other.CURRENT_VALUE (i)};}) \
+                    { \
+                        new (&value_.template get <i> ().value) decltype (CURRENT_VALUE (i)) {other.CURRENT_VALUE (i)}; \
+                    } \
+                    break;
+                    
+            BOOST_PP_REPEAT (MAX, X, _)
+            #undef X
+            }
+            active_ = other.active_;
         }
         
-        active_ = other.active_;
-        switch (active_)
-        {
-#define X(_, i, __) \
-case i: \
-new (&CURRENT_VALUE (i)) decltype (CURRENT_VALUE (i)) {other.CURRENT_VALUE (i)}; \
-break;
-                BOOST_PP_REPEAT (MAX, X, _)
-#undef X
-        }
+        
+        
         
         
         
@@ -172,6 +204,20 @@ break;
                         break;
                         
                 BOOST_PP_REPEAT (MAX, X, _)
+                #undef X0
+                #undef X
+                }
+                active_ = other.active_;
+            } else
+            {
+                switch (active_)
+                {
+                #define X(_, i, __) \
+                    case i: \
+                        CURRENT_VALUE (i) = move (other.CURRENT_VALUE (i)); \
+                        break;
+                        
+                BOOST_PP_REPEAT (MAX, X, _)
                 #undef X
                 }
             }
@@ -191,6 +237,7 @@ break;
             BOOST_PP_REPEAT (MAX, X, _)
             #undef X
             }
+            active_ = other.active_;
         }
         
         
@@ -283,6 +330,7 @@ break;
                 return other.CURRENT_VALUE (i); \
                 break;
         BOOST_PP_REPEAT (MAX, X0, _)
+        #undef X0
         }
     }}
     {
@@ -317,6 +365,7 @@ new (&value_.template get <ALIAS (i)> ().value) ALIAS (i) {move (other.value_.te
                 break;
         BOOST_PP_REPEAT (MAX, X, _)
         #undef ALIAS
+        #undef X
         #undef X0
         }
     }
@@ -372,25 +421,33 @@ new (&value_.template get <ALIAS (i)> ().value) ALIAS (i) {move (other.value_.te
     }
     {
         return value_.template get <A> ().value;
-//        if (active_ < 0)
-//        {
-//            throw runtime_error ("not active_!");
-//        }
-//
-//        switch (active_)
-//        {
-//        #define X(_, i, __) \
-//            case i: \
-//                if constexpr (is_convertible_v <CURRENT_TYPE (i), A>) \
-//                    return CURRENT_VALUE (i); \
-//                else \
-//                    throw runtime_error ("not convertible"); \
-//                break;
-//
-//            BOOST_PP_REPEAT (MAX, X, _)
-//        #undef X
-//
-//        }
+    }
+    
+    template <typename A>
+    operator A & ()
+    requires requires {
+        requires type_list_t <T, U...>::template find <A> == -1;
+    }
+    {
+        if (active_ < 0)
+        {
+            throw runtime_error ("not active_!");
+        }
+
+        switch (active_)
+        {
+        #define X(_, i, __) \
+            case i: \
+                if constexpr (is_convertible_v <CURRENT_TYPE (i), A>) \
+                    return CURRENT_VALUE (i); \
+                else \
+                    throw runtime_error ("not convertible"); \
+                break;
+
+            BOOST_PP_REPEAT (MAX, X, _)
+        #undef X
+
+        }
     }
     
     template <typename A>
@@ -740,6 +797,8 @@ break;
 
 struct emptyy {};
  
+
+
 template <int I, typename T, typename... U>
 //requires ((is_assignable_v<U, P> || ...))
 union vari <I, T, U...>
