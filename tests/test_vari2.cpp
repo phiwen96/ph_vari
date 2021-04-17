@@ -530,109 +530,474 @@ struct value_advancer <range_values_t <begin_value_t <a, b>, end_value_t <a, b>>
 };
 
 
-
-template <typename...>
-struct begin_type;
-
-template <typename T, typename... U>
-struct begin_type <T, U...>
-{
-    using type = T;
-};
-
-template <typename...>
-struct end_type;
-
-template <typename T, typename... U>
-struct end_type <T, U...>
-{
-    using type = typename end_type <U...>::type;
-};
-
-template <typename T>
-struct end_type <T>
-{
-    using type = T;
-};
-
-
-
-template <typename... T>
-struct range_types
-{
-    
-};
-
 template <typename...>
 struct types
 {
     
 };
 
+
+template <typename...>
+struct has_type_t;
+
+template <>
+struct has_type_t <>
+{
+    
+};
+
+template <template <typename...> typename T>
+struct has_type_t <T <>>
+{
+    
+};
+
+template <typename A>
+struct has_type_t <A>
+{
+    template <typename T>
+    inline static constexpr bool value = is_same_v <T, A>;
+};
+
+template <template <typename...> typename T, typename A, typename... B>
+struct has_type_t <T <A, B...>>
+{
+    template <typename F>
+    inline static constexpr bool value = has_type_t <A, B...>::template value <F>;
+};
+
+template <typename A, typename... B>
+struct has_type_t <A, B...>
+{
+private:
+    template <typename...> struct types_ {};
+    template <typename...>
+    struct same_;
+
+    template <typename C, typename... D, typename... E>
+    struct same_ <types_ <C, D...>, types_ <E...>>
+    {
+        template <typename F>
+        inline static constexpr bool value = is_same_v <F, C> or same_ <types_ <D...>, types_ <E..., C>>::template value <F>;
+    };
+
+    template <typename... D>
+    struct same_ <types_ <>, types_ <D...>>
+    {
+        template <typename F>
+        inline static constexpr bool value = false;
+    };
+    
+public:
+    template <typename F>
+    inline static constexpr bool value = same_ <types_ <A, B...>, types_ <>>::template value <F>;
+};
+
+static_assert (has_type_t <int, double, float>::template value <int> == true, "");
+static_assert (has_type_t <int, double, float>::template value <double> == true, "");
+static_assert (has_type_t <int, double, float>::template value <float> == true, "");
+static_assert (has_type_t <int, double, float>::template value <char> == false, "");
+
+
+
+
+
+template <typename...>
+struct begin_type_t;
+
+template <>
+struct begin_type_t <>
+{
+    
+};
+
+template <template <typename...> typename T>
+struct begin_type_t <T <>>
+{
+    
+};
+
+template <template <typename...> typename T, typename A, typename... B>
+struct begin_type_t <T <A, B...>>
+{
+    using type = A;
+    inline static constexpr int value = 0;
+};
+
+template <typename A, typename... B>
+struct begin_type_t <A, B...>
+{
+    using type = A;
+    inline static constexpr int value = 0;
+};
+
+static_assert (is_same_v <bool, typename begin_type_t <tuple <bool, int, string>>::type>, "");
+static_assert (is_same_v <bool, typename begin_type_t <bool, int, string>::type>, "");
+
+template <typename... T>
+using begin_type = typename begin_type_t <T...>::type;
+
+template <typename...>
+struct end_type_t;
+
+template <>
+struct end_type_t <>
+{
+    
+};
+
+template <template <typename...> typename T>
+struct end_type_t <T <>>
+{
+    
+};
+
+template <typename A, typename... B>
+struct end_type_t <A, B...>
+{
+    using type = typename end_type_t <B...>::type;
+    inline static constexpr int value = end_type_t <B...>::value + 1;
+};
+
+template <template <typename...> typename T, typename A, typename... B>
+struct end_type_t <T <A, B...>>
+{
+    using type = typename end_type_t <T <B...>>::type;
+    inline static constexpr int value = end_type_t <T <B...>>::value + 1;
+};
+
+template <typename A>
+struct end_type_t <A>
+{
+    using type = A;
+    inline static constexpr int value = 0;
+};
+
+template <template <typename...> typename T, typename A>
+struct end_type_t <T <A>>
+{
+    using type = A;
+    inline static constexpr int value = 0;
+};
+
+static_assert (is_same_v <string, typename end_type_t <tuple <bool, int, string>>::type>, "");
+static_assert (is_same_v <char, typename end_type_t <bool, int, char>::type>, "");
+static_assert (end_type_t <int, char, double>::value == 2, "");
+static_assert (end_type_t <tuple <int, char, double>>::value == 2, "");
+
+//static_assert (is_same_v <string, typename end_type <bool, int, string>::type>, "");
+
+template <typename... T>
+using end_type = typename end_type_t <T...>::type;
+
+
+
+
 template <typename...>
 struct pop;
 
-//template <template <typename...> typename T, typename A,
-//template <typename...> typename U, typename... D>
-//auto pop_back (T <A...>, U <D...>) -> decltype (pop_back (<#T<A, B...>#>, <#U<D...>#>))
-//{
-//
-//}
+template <typename A, typename... B>
+struct pop <A, B...>
+{
+    template <template <typename...> typename T>
+    using front = typename pop <T <A, B...>>::front;
+    
+    template <template <typename...> typename T>
+    using back = typename pop <T <A, B...>>::back;
+};
+
+template <>
+struct pop <> {};
+
+template <template <typename...> typename T>
+struct pop <T <>> {};
 
 template <template <typename...> typename T, typename A, typename... B>
 struct pop <T <A, B...>>
 {
-    using front = T <B...>;
-    using back = typename pop <T <B...>, T <A>>::back;
-    
 private:
+    template <typename...>
+    struct back_;
     
+    template <typename C, typename... D, typename... E>
+    struct back_ <T <C, D...>, T <E...>>
+    {
+        using type = typename back_ <T <D...>, T <E..., C>>::type;
+    };
+
+    template <typename C, typename... D>
+    struct back_ <T <C>, T <D...>>
+    {
+        using type = T <D...>;
+    };
     
+public:
+    using front = T <B...>;
+    using back = typename back_ <T <B...>, T <A>>::type;
 };
 
-template <template <typename...> typename T, typename A, typename... B, typename... C>
-struct pop <T <A, B...>, T <C...>>
-{
-    using back = typename pop <T <B...>, T <C..., A>>::back;
-};
+//template <typename A, typename... B>
+//struct pop
+//{
+//
+//    using back = typename pop <types <A, B...>>
+//};
 
-template <template <typename...> typename T, typename A, typename... B>
-struct pop <T <A>, T <B...>>
+template <template <typename...> typename T, typename... U>
+struct pop_transform_to
 {
-    using back = T <B...>;
+    using type = pop <typename T <U...>::transform_from>;
 };
 
 
 static_assert (is_same_v <types <int, double>, typename pop <types <int, double, string>>::back>, "");
+static_assert (is_same_v <types <int, double>, typename pop <int, double, string>::back <types>>, "");
+
+static_assert (is_same_v <types <double, string>, typename pop <types <int, double, string>>::front>, "");
+static_assert (is_same_v <types <double, string>, typename pop <int, double, string>::front <types>>, "");
+
+template <typename... A>
+using pop_back = typename pop <A...>::back;
+
+template <typename... A>
+using pop_front = typename pop <A...>::front;
 
 
+template <typename...>
+struct push;
 
-template <typename... U>
-struct advance_type
+template <template <typename...> typename T, typename... A>
+struct push <T <A...>>
 {
-    template <typename T>
-    using type = advance_type <U..., T>;
+    template <typename N>
+    using back = T <A..., N>;
+    
+    template <typename N>
+    using front = T <N, A...>;
 };
+
+template <typename...>
+struct back_t;
+
+template <typename A, typename... B>
+struct back_t <A, B...>
+{
+    using type = typename back_t <B...>::type;
+};
+
+template <template <typename...> typename T, typename A, typename... B>
+struct back_t <T <A, B...>>
+{
+    using type = typename back_t <T <B...>>::type;
+};
+
+template <typename A>
+struct back_t <A>
+{
+    using type = A;
+};
+
+template <template <typename...> typename T, typename A>
+struct back_t <T <A>>
+{
+    using type = A;
+};
+
+template <>
+struct back_t <>
+{
+
+};
+
+template <template <typename...> typename T>
+struct back_t <T <>>
+{
+
+};
+
+static_assert (is_same_v <int, typename back_t <string, char, int>::type>, "");
+static_assert (is_same_v <int, typename back_t <tuple <string, char, int>>::type>, "");
+
+template <typename... T>
+using back = typename back_t <T...>::type;
+
+template <typename...>
+struct front_t;
+
+template <typename A, typename... B>
+struct front_t <A, B...>
+{
+    using type = A;
+};
+
+template <template <typename...> typename T, typename A, typename... B>
+struct front_t <T <A, B...>>
+{
+    using type = A;
+};
+
+template <typename A>
+struct front_t <A>
+{
+    using type = A;
+};
+
+template <template <typename...> typename T, typename A>
+struct front_t <T <A>>
+{
+    using type = A;
+};
+
+template <>
+struct front_t <>
+{
+
+};
+
+template <template <typename...> typename T>
+struct front_t <T <>>
+{
+
+};
+
+static_assert (is_same_v <double, typename front_t <double, char, int>::type>, "");
+static_assert (is_same_v <double, typename front_t <tuple <double, char, int>>::type>, "");
+
+template <typename... T>
+using front = typename front_t <T...>::type;
+
+
+template <typename...>
+struct advance_type;
+
+template <template <typename...> typename T, typename... A>
+struct advance_type <T <A...>>
+{
+    template <typename N>
+    using type = T <A..., N>;
+};
+
+
 
 
 template <typename... T>
 struct retreat_type;
 
+template <>
+struct retreat_type <> {};
+
+template <template <typename...> typename T>
+struct retreat_type <T <>> {};
+
 template <typename A, typename... B>
 struct retreat_type <A, B...>
 {
-//    template <typename T>
-//    requires (is_same_v <T, typename end_type <B...>::type>)
-//    using type = types <>
-    
+    template <template <typename...> typename T>
+    using type = pop_back <T <A, B...>>;
+};
+
+template <template <typename...> typename T, typename A, typename... B>
+struct retreat_type <T <A, B...>>
+{
+    using type = pop_back <T <A, B...>>;
 };
 
 template <typename... T>
+struct type_transformer_t;
+
+template <typename...>
+struct range_types_t;
+
+template <typename A, typename... B>
+struct range_types_t <begin_type_t <A, B...>, end_type_t <A, B...>>
+{
+    using begin_t = begin_type <A, B...>;
+    using end_t = end_type <A, B...>;
+    
+//    template <typename N>
+//    using expand_range = next_transform <range_types_t <A, B..., N>>;
+
+    template <typename... N>
+    using transform = type_transformer_t <N...>;
+    
+    template <typename...>
+    struct transform_from;
+    
+//    template <template <typename...> typename T, typename... U>
+//    struct transform_from <T <U...>>
+//    {
+//        using type = next_transform <range_types_t <next_transform, U...>>;
+//    };
+    
+    
+//    using pop_last =
+    
+};
+
+
+template <typename...>
 struct type_advancer;
+
+template <typename... T>
+struct type_advancer <range_types_t <begin_type_t <T...>, end_type_t <T...>>>
+{
+    template <typename N>
+    using type = typename range_types_t <begin_type_t <T...>, end_type_t <T...>>::template transform <T..., N>;
+//    using type = typename push <>::template back <N>;
+};
 
 template <typename... T>
 struct type_retreater;
 
+template <typename... T>
+struct type_retreater <range_types_t <begin_type_t <T...>, end_type_t <T...>>>
+{
+    using _range = range_types_t <begin_type_t <T...>, end_type_t <T...>>;
+//    template <typename N>
+    using type = typename pop <_range>::back;//pop_transform_to <_range>;
+};
+
+
+template <typename... T>
+struct finish_type_t;
+
+template <typename T, typename... U>
+struct finish_type_t <T, U...>
+{
+    using type = end_type <T, U...>;
+};
+
+
+
+template <typename...>
+struct empty_type_t;
+
+template <typename T, typename... U>
+struct empty_type_t <T, U...>
+{
+    inline static constexpr bool value = false;
+};
+
+template <template <typename...> typename T, typename A, typename... B>
+struct empty_type_t <T <A, B...>>
+{
+    inline static constexpr bool value = false;
+};
+
+template <>
+struct empty_type_t <>
+{
+    inline static constexpr bool value = true;
+};
+
+template <template <typename...> typename T>
+struct empty_type_t <T <>>
+{
+    inline static constexpr bool value = true;
+};
+
+template <typename... T>
+constexpr auto empty_type = empty_type_t <T...>::value;
 
 
 
@@ -640,6 +1005,155 @@ struct type_retreater;
 
 
 
+
+template <typename A, typename... B>
+struct type_transformer_t <range_types_t <begin_type_t <A, B...>, end_type_t <A, B...>>>
+{
+    using range_types_ = range_types_t <begin_type_t <A, B...>, end_type_t <A, B...>>;
+    using finished_type_ = typename range_types_::end_t;
+    using type_advancer_ = type_advancer <range_types_>;
+    
+    template <typename T>
+    using advance = typename type_advancer <range_types_>::template type <T>;
+    
+//    template <typename T>
+    using retreat = typename type_retreater <range_types_>::type;
+    
+    template <typename F>
+    inline static constexpr bool works = requires (F&& fun){
+        {fun.template operator () <C> ()};
+    };
+    
+    constexpr type_transformer_t (auto&&... fun)
+    {
+        auto aa = [] <typename C, typename... D> (auto&& me, auto&& fun)
+        requires requires {
+            {fun.template operator () <C> ()};
+        }
+        {
+            
+            if (not fun.template operator () <C> ())
+            {
+                if constexpr (sizeof... (D) > 0)
+                {
+                    me.template operator () <D...> (forward <decltype (me)> (me), forward <decltype (fun)> (fun));
+                }
+            }
+
+        };
+        
+        [...funs = forward <decltype (fun)> (fun)] ()
+        {
+            (..., ([] (auto&& f) {
+                
+                if constexpr (requires {
+                    {f.template operator () <C> ()};
+                })
+                {
+                    auto ff = [] <typename C, typename... D> (auto&& me, auto&& fun)
+                    requires requires {
+                        {fun.template operator () <C> ()};
+                    }
+                    {
+                        
+                        if (not fun.template operator () <C> ())
+                        {
+                            if constexpr (sizeof... (D) > 0)
+                            {
+                                me.template operator () <D...> (forward <decltype (me)> (me), forward <decltype (fun)> (fun));
+                            }
+                        }
+
+                    };
+                    
+                    ff (ff, forward <decltype (f)> (f));
+                }
+            }(funs)));
+        };
+        
+//        ((aa.template operator () <A, B...> (move (aa), forward <decltype (fun)> (fun))), ...);
+        
+//        for (auto i = begin_type_t <A, B...>::value; i < end_type_t <A, B...>::value; ++i)
+//        {
+//            if (fun.template operator () <front <A, B...>> (*this))
+//            {
+//                break;
+//            }
+//        }
+    }
+    
+};
+
+template <typename... T>
+using make_type_transformer = type_transformer_t <range_types_t <begin_type_t <T...>, end_type_t <T...>>>;
+
+
+template <typename A>
+concept is_string = requires {
+    requires (is_same_v <A, string>);
+};
+
+TEST_CASE ("")
+{
+    using transformer = make_type_transformer <int, double, string, char>;
+    transformer t =
+    {
+        
+//        [] <is_string T> () constexpr {
+//            cout << "hi" << endl;
+//            if constexpr (is_same_v <T, int>) {
+//                cout << "int" << endl;
+//            } else if constexpr (is_same_v <T, double>)
+//            {
+//                cout << "double" << endl;
+//            }
+//            return true;
+//        },
+        
+        [] <typename T> () constexpr {
+            cout << "hi" << endl;
+            if constexpr (is_same_v <T, int>) {
+                cout << "int" << endl;
+            } else if constexpr (is_same_v <T, double>)
+            {
+                cout << "double" << endl;
+            }
+            return true;
+        }
+        
+    };
+    
+    
+}
+
+template <typename...>
+struct seq_t;
+
+template <typename A, typename... B>
+struct seq_t <A, B...>
+{
+    
+};
+
+template <typename start, typename end>
+consteval auto make_seq_t () -> auto
+{
+    using transformer = make_type_transformer <start, end>;//make_value_transformer <start, end>;
+
+    constexpr auto fun = [] <typename currEnd, typename... I> (auto fun) consteval -> auto
+    {
+        if constexpr (transformer::template done_value <currEnd>)
+        {
+            return seq_t <I...> {};
+        }
+        else
+        {
+            return fun.template operator () <transformer::template advance <currEnd>, I..., currEnd> (fun);
+        }
+    };
+    
+    return fun.template operator() <start> (fun);
+}
 
 template <typename T, typename... U>
 struct type_advancer <T, U...>
@@ -714,6 +1228,8 @@ using make_value_transformer = value_transformer_t <
 
 
 
+
+
 template <auto t, auto v>
 constexpr auto transform_next_value = t.next_value <v>;
 
@@ -727,11 +1243,35 @@ constexpr auto transform_next_value = t.next_value <v>;
 
 
 
-template <auto... J>
-struct seq_v
+template <auto...>
+struct seq_v;
+
+template <auto i, auto... j>
+struct seq_v <i, j...>
 {
-    
+    constexpr auto operator () (auto&& fun) const -> void//-> auto&
+    {
+        if (fun (i))
+        {
+//            return *this;
+        } else if constexpr (sizeof... (j) > 0)
+        {
+            return seq_v <j...> {} (forward <decltype (fun)> (fun));
+        } else
+        {
+//            return *this;
+        }
+    }
 };
+
+
+
+
+
+
+
+
+
 
 template <typename...>
 struct seq_size_t;
@@ -792,7 +1332,11 @@ TEST_CASE ("")
 {
     auto ad = make_value_transformer <0, 10> {};
     
-    auto aa = make_seq <0, 10> ();
+    constexpr auto aa = make_seq <0, 10> ();
+    
+    aa ([](auto const& i) constexpr {/*cout << i << endl;*/if (i == 3)return true; return false;});
+    
+    return;
     
     [] <auto... I> (seq_v <I...> aa) {
         
@@ -804,6 +1348,7 @@ TEST_CASE ("")
 
 TEST_CASE ("")
 {
+    return;
     [] <typename... T> (tuple <T...> t)
     {
         auto fun = [](auto& g) {
