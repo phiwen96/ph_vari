@@ -303,12 +303,7 @@ struct alignas (16) big
 };
 
 
-template <auto... J>
-struct seq_t
-{
-    
-//    inline static constexpr int value = I;
-};
+
 
 
 template <typename...>
@@ -435,12 +430,39 @@ constexpr auto end_value = end_value_t <t...>::value;
 
 
 
+template <typename... T>
+struct size_of_t
+{
+    inline static constexpr size_t value = sizeof... (T);
+};
 
-template <auto...>
-struct range_values_t;
+template <typename... T>
+constexpr auto size_of = size_of_t <T...>::value;
+
+template <typename... T>
+struct range_values_t
+{
+    using begin_type = begin_value_t <0, sizeof... (T)>;
+    using end_type = end_value_t <0, sizeof... (T)>;
+    
+    using begin_value_type = typename begin_type::value_type;
+    using end_value_type = typename end_type::value_type;
+    
+    using value_type = common_type_t <begin_value_type, end_value_type>;
+    
+    inline static constexpr value_type begin_value = begin_type::value;
+    inline static constexpr value_type end_value = end_type::value;
+
+};
+
+//template <typename... T>
+//struct range_values_t <size_of <T...>>
+//{
+//
+//};
 
 template <auto a, auto b>
-struct range_values_t <a, b>
+struct range_values_t <begin_value_t <a, b>, end_value_t <a, b>>
 {
     using begin_value_type = typename begin_value_t <a, b>::value_type;
     using end_value_type = typename end_value_t <a, b>::value_type;
@@ -452,8 +474,8 @@ struct range_values_t <a, b>
     inline static constexpr value_type end_value = end_value_t <a, b>::value;
 };
 
-template <auto... t>
-constexpr auto range_values = range_values_t <t...> {};
+template <auto a, auto b>
+constexpr auto range_values = range_values_t <begin_value_t <a, b>, end_value_t <a, b>> {};
 
 
 template <auto...>
@@ -488,13 +510,20 @@ struct retreat_value_t <t>
 template <auto... t>
 constexpr auto retreat_value = retreat_value_t <t...>::value;
 
-template <typename... Range_values>
-struct value_advancer;
+template <typename... T>
+struct value_advancer
+{
+    using value_type = typename range_values_t <T...>::value_type;
+    
+    template <auto n>
+    inline static constexpr value_type value = advance_value_t <n>::value;
+
+};
 
 template <auto a, auto b>
-struct value_advancer <range_values_t <a, b>>
+struct value_advancer <range_values_t <begin_value_t <a, b>, end_value_t <a, b>>>
 {
-    using value_type = typename range_values_t <a, b>::value_type;
+    using value_type = typename range_values_t <begin_value_t <a, b>, end_value_t <a, b>>::value_type;
     
     template <auto n>
     inline static constexpr value_type value = advance_value_t <n>::value;
@@ -502,79 +531,159 @@ struct value_advancer <range_values_t <a, b>>
 
 
 
+template <typename...>
+struct begin_type;
 
+template <typename T, typename... U>
+struct begin_type <T, U...>
+{
+    using type = T;
+};
+
+template <typename...>
+struct end_type;
+
+template <typename T, typename... U>
+struct end_type <T, U...>
+{
+    using type = typename end_type <U...>::type;
+};
+
+template <typename T>
+struct end_type <T>
+{
+    using type = T;
+};
+
+
+
+template <typename... T>
+struct range_types
+{
+    
+};
+
+template <typename...>
+struct types
+{
+    
+};
+
+template <typename...>
+struct pop;
+
+//template <template <typename...> typename T, typename A,
+//template <typename...> typename U, typename... D>
+//auto pop_back (T <A...>, U <D...>) -> decltype (pop_back (<#T<A, B...>#>, <#U<D...>#>))
+//{
+//
+//}
+
+template <template <typename...> typename T, typename A, typename... B>
+struct pop <T <A, B...>>
+{
+    using front = T <B...>;
+    using back = typename pop <T <B...>, T <A>>::back;
+    
+private:
+    
+    
+};
+
+template <template <typename...> typename T, typename A, typename... B, typename... C>
+struct pop <T <A, B...>, T <C...>>
+{
+    using back = typename pop <T <B...>, T <C..., A>>::back;
+};
+
+template <template <typename...> typename T, typename A, typename... B>
+struct pop <T <A>, T <B...>>
+{
+    using back = T <B...>;
+};
+
+
+static_assert (is_same_v <types <int, double>, typename pop <types <int, double, string>>::back>, "");
+
+
+
+template <typename... U>
+struct advance_type
+{
+    template <typename T>
+    using type = advance_type <U..., T>;
+};
+
+
+template <typename... T>
+struct retreat_type;
+
+template <typename A, typename... B>
+struct retreat_type <A, B...>
+{
+//    template <typename T>
+//    requires (is_same_v <T, typename end_type <B...>::type>)
+//    using type = types <>
+    
+};
+
+template <typename... T>
+struct type_advancer;
+
+template <typename... T>
+struct type_retreater;
+
+
+
+
+
+
+
+
+
+template <typename T, typename... U>
+struct type_advancer <T, U...>
+{
+    
+};
+
+
+template <typename T, typename... U>
+struct type_retreater <T, U...>
+{
+    
+};
 
 template <typename...>
 struct value_retreater;
 
 template <auto a, auto b>
-struct value_retreater <range_values_t <a, b>>
+struct value_retreater <range_values_t <begin_value_t <a, b>, end_value_t <a, b>>>
 {
-    using value_type = typename range_values_t <a, b>::value_type;
+    using value_type = typename range_values_t <begin_value_t <a, b>, end_value_t <a, b>>::value_type;
     
     template <auto n>
     inline static constexpr value_type value = advance_value_t <n>::value;
 };
 
-
-
-template <typename...>
-struct value_transformer_t;
-
-template <auto start, auto end>
-requires requires {
-    start < end;
-    requires start < end;
-}
-struct value_transformer_t <range_values_t <start, end>>
+template <typename... T>
+struct value_transformer_t
 {
-//    using value_type = common_type_t <typename range_values_t <start, end>::begin_value_type, typename range_values_t <start, end>::end_value_type>;
-    using value_type = int;
-    inline static constexpr value_type begin = start;
     
-    template <auto n>
-    inline static constexpr value_type advance = next_value <n>;
-    
-    template <value_type n>
-    inline static constexpr value_type retreat = previous_value <n>;
-    
-    template <value_type n>
-    inline static constexpr bool done = finished_value_t <range_values_t <start, end>::end>::template value <n>;
+    using range_type = range_values_t <begin_value_t <0, sizeof... (T)>, end_value_t <0, sizeof... (T)>>;
+    using finished_type = finished_value_t <range_type::begin_value, range_type::end_value>;
+
 };
-
-//template <auto start, auto end>
-//requires requires {
-//    start > end;
-//    requires start > end;
-//}
-//struct value_transformer_t <range_values_t <start, end>>
-//{
-//    using range_type = range_values_t <start, end>;
-//    using value_type = int;
-//
-//    inline static constexpr value_type begin = range_type::begin;
-//
-//    template <value_type n>
-//    inline static constexpr value_type advance = previous_value <n>;
-//
-//    template <value_type n>
-//    inline static constexpr value_type retreat = next_value <n>;
-//
-//    template <value_type n>
-//    inline static constexpr bool done = finished_value_t <range_type::end>::template value <n>;
-//};
-
-
 
 template <auto start_, auto end_>
 struct value_transformer_t <
-    range_values_t <start_, end_>,
-    finished_value_t <range_values_t <start_, end_>::end_value>,
-    value_advancer <range_values_t <start_, end_>>,
-    value_retreater <range_values_t <start_, end_>>
+    range_values_t <begin_value_t <start_, end_>, end_value_t <start_, end_>>,
+    finished_value_t <range_values_t <begin_value_t <start_, end_>, end_value_t <start_, end_>> ::end_value>,
+    value_advancer <range_values_t <begin_value_t <start_, end_>, end_value_t <start_, end_>>>,
+    value_retreater <range_values_t <begin_value_t <start_, end_>, end_value_t <start_, end_>>>
 >
 {
-    using range_type = range_values_t <start_, end_>;
+    using range_type = range_values_t <begin_value_t <start_, end_>, end_value_t <start_, end_>>;
     using finished_type = finished_value_t <range_type::end_value>;
     using begin_type = typename range_type::begin_type;
     using advancer_type = value_advancer <range_type>;
@@ -597,10 +706,10 @@ using value_transformer = value_transformer_t <T...>;
 
 template <auto start_, auto end_>
 using make_value_transformer = value_transformer_t <
-    range_values_t <start_, end_>,
-    finished_value_t <range_values_t <start_, end_>::end_value>,
-    value_advancer <range_values_t <start_, end_>>,
-    value_retreater <range_values_t <start_, end_>>
+     range_values_t <begin_value_t <start_, end_>, end_value_t <start_, end_>>,
+    finished_value_t <range_values_t  <begin_value_t <start_, end_>, end_value_t <start_, end_>>::end_value>,
+    value_advancer <range_values_t <begin_value_t <start_, end_>, end_value_t <start_, end_>>>,
+    value_retreater <range_values_t <begin_value_t <start_, end_>, end_value_t <start_, end_>>>
 >;
 
 
@@ -618,6 +727,23 @@ constexpr auto transform_next_value = t.next_value <v>;
 
 
 
+template <auto... J>
+struct seq_v
+{
+    
+};
+
+template <typename...>
+struct seq_size_t;
+
+template <auto... J>
+struct seq_size_t <seq_v <J...>>
+{
+    inline static constexpr size_t value = sizeof... (J);
+};
+
+
+
 
 
 template <auto start, decltype (start) end>
@@ -629,7 +755,7 @@ consteval auto make_seq () -> auto
     {
         if constexpr (transformer::template done_value <currEnd>)
         {
-            return seq_t <I...> {};
+            return seq_v <I...> {};
         }
         else
         {
@@ -640,11 +766,40 @@ consteval auto make_seq () -> auto
     return fun.template operator() <start> (fun);
 }
 
+
+
 template <auto max>
-constexpr seq_t seq = make_seq <zero_value <decltype (max)>, max> ();
+constexpr seq_v seq = make_seq <zero_value <decltype (max)>, max> ();
 
 
+template <typename... T>
+struct Te
+{
+    auto te ()
+    {
+        
+    }
+};
 
+template <typename... T>
+struct seq_t
+{
+    decltype (make_seq <0, sizeof... (T)>) seq_value = make_seq <0, sizeof... (T)>;
+    
+};
+
+TEST_CASE ("")
+{
+    auto ad = make_value_transformer <0, 10> {};
+    
+    auto aa = make_seq <0, 10> ();
+    
+    [] <auto... I> (seq_v <I...> aa) {
+        
+    } (aa);
+    cout << endl;
+    
+}
 
 
 TEST_CASE ("")
@@ -655,7 +810,7 @@ TEST_CASE ("")
             cout << g << endl;
         };
         
-        [&t] <auto... I> (seq_t <I...>, auto f)
+        [&t] <auto... I> (seq_v <I...>, auto f)
         {
             ((f (get <I> (t))), ...);
             (cout << ... << get <I> (t));
@@ -667,7 +822,7 @@ TEST_CASE ("")
         auto fun = [](auto& a) {
             cout << a << endl;
         };
-        [&t] <auto... I> (seq_t <I...>, auto f)
+        [&t] <auto... I> (seq_v <I...>, auto f)
         {
             ((f (get <I> (t))), ...);
             (cout << ... << get <I> (t));

@@ -35,7 +35,23 @@ struct var <T, U...>
     static_assert (sizeof... (U) + 1 <= MAX, "LIMIT!!!");
     inline static constexpr int size = sizeof... (U) + 1;
     
-    
+    template <typename P>
+    constexpr auto same_type () const -> bool
+    {
+        switch (active_)
+        {
+        #define X(_, i, __) \
+            case i: \
+if constexpr (is_same_v <CURRENT_TYPE (i), P>) \
+{ \
+return true; \
+} \
+                break;
+        BOOST_PP_REPEAT (MAX, X, _)
+        #undef X
+        }
+        return false;
+    }
     
     
 
@@ -274,9 +290,9 @@ struct var <T, U...>
      set current value equal to
      */
     template <typename P>
-//    requires (vari_value_type_exists <P>)
     requires requires {
         requires false;
+//        requires vari_value_type_exists <P>;
     }
     auto operator= (P&& p) -> auto&
     {
@@ -1020,6 +1036,10 @@ union vari <I, T>
             return "2";
     }
 };
+
+
+
+//template <typename T, typename name
 
 
 #endif
