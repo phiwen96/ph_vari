@@ -16,3 +16,6 @@
 [submodule "dependencies/ph_type"]
 	path = dependencies/ph_type
 	url = https://github.com/phiwen96/ph_type
+[submodule "dependencies/ph_concepts"]
+	path = dependencies/ph_concepts
+	url = https://github.com/phiwen96/ph_concepts
