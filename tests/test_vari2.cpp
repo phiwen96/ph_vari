@@ -19,9 +19,11 @@ overload (T...) -> overload <T...>;
 
 TEST_CASE ("")
 {
-    overload o {[](int){cout << "int" << endl;}, [](double){cout << "double" << endl;}};
-    auto tw = type_watcher (o);
-    o (double {3});
+    overload o {[](){cout << "int" << endl; return false;}, [](){cout << "double" << endl; return false;}};
+//    auto tw = type_watcher (o);
+//    o ( );
+    
+    auto fun = type_watcher([]{return false;}, []{return false;});
 }
 
 
